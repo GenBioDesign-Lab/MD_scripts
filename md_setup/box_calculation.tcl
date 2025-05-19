@@ -1,7 +1,11 @@
-#Usage: vmd -dispdev text -e box_calculation.tcl
+#Usage: vmd -dispdev text -e box_calculation.tcl <.psf file> <.pdb file>
+# Get command-line arguments
+set psf_file [lindex $argv 0]
+set pdb_file [lindex $argv 1]
+
 # Load system
-mol new protein_ionized.psf
-mol addfile protein_ionized.pdb
+mol new $psf_file
+mol addfile $pdb_file
 
 # Bounding box
 set all   [atomselect top all]
