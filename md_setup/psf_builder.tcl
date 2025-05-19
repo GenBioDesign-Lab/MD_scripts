@@ -1,12 +1,7 @@
 # PSF Builder Script
 #Usage: vmd -dispdev text -e psf_builder.tcl
-# Create working directory; remove old output files
-#mkdir -p output
-#rm -f output/output_protein.pdb
+# Must use vmd 2.0.4 because its supported new version of topology files
 
-# Remove HETATM lines from input.pdb
-#grep -v 'HETATM' 6pti.pdb > output/output_protein.pdb
-#grep -v 'ATOM' 6pti.pdb > output/output_HETATM.pdb
 
 # Require packages
 package require psfgen
@@ -27,13 +22,19 @@ set topology_files {
 foreach topo_file $topology_files {
     topology "$input_path$topo_file"
 }
+#open log file
+psfgen_logfile "structure_preparation.log"
+
 #change HIS to HSD
 pdbalias residue HIS HSD
 
+#change U to URA (for RNA)
+#pdbalias residue U URA
+
 #Build protein segment
 # Segment name max 4 characters
-segment 1BYI {
-    pdb output/output_protein.pdb
+segment PROT {
+    pdb test/protein.pdb
 }
 
 #patch protein segment: patch [list] <patch residue name> <segid:resid>
@@ -41,13 +42,21 @@ segment 1BYI {
 
 #Read protein coordinates from PDB file
 pdbalias atom ILE CD1 CD
-coordpdb output/output_protein.pdb 1BYI
+coordpdb test/protein.pdb PROT
+
+#Build RNA segment
+#segment RNA {
+#    pdb test/ligand.pdb
+#}
+
+#coordpdb test/ligand.pdb RNA
 
 # Build missing atoms and guess missing coordinates
 guesscoord
 
 # Write the PSF and PDB files
-writepsf 1BYI.psf
-writepdb 1BYI.pdb
+writepsf test/test_psf.psf
+writepdb test/test_psf.pdb
 
+psfgen_logfile close
 exit
