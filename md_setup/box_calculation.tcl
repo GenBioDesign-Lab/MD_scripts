@@ -1,4 +1,4 @@
-#Usage: vmd -dispdev text -e box_calculation.tcl <.psf file> <.pdb file>
+#Usage: vmd -e box_calculation.tcl -args <.psf file> <.pdb file>
 # Get command-line arguments
 set psf_file [lindex $argv 0]
 set pdb_file [lindex $argv 1]
