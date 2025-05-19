@@ -4,6 +4,8 @@ import os
 import sys
 import re
 
+#Usage: python extract_and_plot_from_log_file.py <log_file>
+
 def select_column(available_columns):
     """Display column options and get user selection"""
     print("\n=== Available columns to plot ===")
