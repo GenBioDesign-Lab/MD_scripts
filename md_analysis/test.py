@@ -1,5 +1,5 @@
-import MDAnalysis as mda
-import warnings
+#import MDAnalysis as mda
+#import warnings
 # Load simulation results with a single line
 u = mda.Universe('example_data/9BWZ_ionized.psf','example_data/final_eq.dcd')
 
