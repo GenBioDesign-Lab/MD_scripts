@@ -31,12 +31,15 @@ pdbalias residue HIS HSD
 #change U to URA (for RNA)
 pdbalias residue U URA
 
+# Fix atom naming for ILE
+pdbalias atom ILE CD1 CD
+
 #Build protein segment
 # Segment name max 4 characters
 segment PROA {
     pdb 9bwz_aligned.pdb
     first NTER
-    end CTER
+    last CTER
     chain A
 }
 coordpdb 9bwz_aligned.pdb PROA
@@ -44,7 +47,7 @@ coordpdb 9bwz_aligned.pdb PROA
 segment PROB {
     pdb 9bwz_aligned.pdb
     first NTER
-    end CTER
+    last CTER
     chain B
 }
 coordpdb 9bwz_aligned.pdb PROB
@@ -52,7 +55,7 @@ coordpdb 9bwz_aligned.pdb PROB
 segment PROC {
     pdb 9bwz_aligned.pdb
     first NTER
-    end CTER
+    last CTER
     chain C
 }
 coordpdb 9bwz_aligned.pdb PROC
@@ -60,7 +63,7 @@ coordpdb 9bwz_aligned.pdb PROC
 segment PROD {
     pdb 9bwz_aligned.pdb
     first NTER
-    end CTER
+    last CTER
     chain D
 }
 coordpdb 9bwz_aligned.pdb PROD
@@ -68,13 +71,11 @@ coordpdb 9bwz_aligned.pdb PROD
 #patch protein segment: patch [list] <patch residue name> <segid:resid>
 #patch DISU BPTI:5 BPTI:55
 
-pdbalias atom ILE CD1 CD
-
 #Build RNA segment
 segment RNA {
     pdb 9bwz_aligned.pdb
-    first NTER
-    end CTER
+    first 5TER
+    last 3TER
     chain E
 }
 
@@ -85,7 +86,7 @@ guesscoord
 
 # Write the PSF and PDB files
 writepsf 9bwz.psf
-writepdb bwz_psf.pdb
+writepdb 9bwz_psf.pdb
 
 psfgen_logfile close
 exit
