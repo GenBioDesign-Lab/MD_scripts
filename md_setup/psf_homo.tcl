@@ -6,7 +6,7 @@
 set input_pdb "9bwz_aligned.pdb"
 
 # Topology directory path
-set topdir "/data01/genbiolab/mdanh/data/CHARMMFF/toppar"
+set topdir "/data01/genbiolab/jiyun/data/toppar"
 
 # Define list of topology files to use
 set topology_files {
