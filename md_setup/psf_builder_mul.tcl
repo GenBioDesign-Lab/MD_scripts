@@ -33,31 +33,59 @@ pdbalias residue U URA
 
 #Build protein segment
 # Segment name max 4 characters
-segment PROT {
+segment PROA {
     pdb 9bwz_aligned.pdb
+    first NTER
+    end CTER
+    chain A
 }
+coordpdb 9bwz_aligned.pdb PROA
+
+segment PROB {
+    pdb 9bwz_aligned.pdb
+    first NTER
+    end CTER
+    chain B
+}
+coordpdb 9bwz_aligned.pdb PROB
+
+segment PROC {
+    pdb 9bwz_aligned.pdb
+    first NTER
+    end CTER
+    chain C
+}
+coordpdb 9bwz_aligned.pdb PROC
+
+segment PROD {
+    pdb 9bwz_aligned.pdb
+    first NTER
+    end CTER
+    chain D
+}
+coordpdb 9bwz_aligned.pdb PROD
 
 #patch protein segment: patch [list] <patch residue name> <segid:resid>
 #patch DISU BPTI:5 BPTI:55
 
 pdbalias atom ILE CD1 CD
 
-#Read protein coordinates from PDB file
-coordpdb 9bwz_aligned.pdb PROT
-
 #Build RNA segment
-#segment RNA {
-#    pdb 9bwz_aligned.pdb
-#}
+segment RNA {
+    pdb 9bwz_aligned.pdb
+    first NTER
+    end CTER
+    chain E
+}
 
-#coordpdb test/ligand.pdb RNA
+coordpdb 9bwz_aligned.pdb RNA
 
 # Build missing atoms and guess missing coordinates
 guesscoord
 
 # Write the PSF and PDB files
-writepsf test/test_psf.psf
-writepdb test/test_psf.pdb
+writepsf 9bwz.psf
+writepdb bwz_psf.pdb
 
 psfgen_logfile close
 exit
