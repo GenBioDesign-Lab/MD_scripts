@@ -4,6 +4,7 @@ import yaml
 import jinja2
 import argparse
 from pathlib import Path
+import glob
 
 
 def load_config(config_file):
@@ -49,12 +50,32 @@ def get_psf_basename(psf_path):
     return os.path.splitext(os.path.basename(psf_path))[0]
 
 
+def discover_files():
+    """Discover .yaml and .j2 files in the script's directory."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Find .yaml files
+    yaml_files = glob.glob(os.path.join(script_dir, "*.yaml")) + glob.glob(os.path.join(script_dir, "*.yml"))
+    
+    # Find .j2 files
+    j2_files = glob.glob(os.path.join(script_dir, "*.j2"))
+    
+    # Get the first file of each type, or None if not found
+    config_file = yaml_files[0] if yaml_files else None
+    template_file = j2_files[0] if j2_files else None
+    
+    return config_file, template_file
+
+
 def main():
+    # Discover default files in script directory
+    default_config, default_template = discover_files()
+    
     parser = argparse.ArgumentParser(description='Generate NAMD configuration files from templates')
-    parser.add_argument('--config', '-c', default='namd_config.yaml',
-                        help='Path to YAML configuration file (default: namd_config.yaml)')
-    parser.add_argument('--template', '-t', default='namd_template.j2',
-                        help='Path to Jinja2 template file (default: namd_template.j2)')
+    parser.add_argument('--config', '-c', default=default_config,
+                        help=f'Path to YAML configuration file (default: {os.path.basename(default_config) if default_config else "auto-discover"})')
+    parser.add_argument('--template', '-t', default=default_template,
+                        help=f'Path to Jinja2 template file (default: {os.path.basename(default_template) if default_template else "auto-discover"})')
     parser.add_argument('--output-dir', '-o', default='.',
                         help='Directory to save generated NAMD files (default: current directory)')
     parser.add_argument('--stages', '-s', nargs='+', 
@@ -69,6 +90,15 @@ def main():
                         help='Disable automatic organization into subfolder based on PSF name')
     
     args = parser.parse_args()
+    
+    # Check if required files were found
+    if args.config is None:
+        print("Error: No .yaml/.yml configuration file found in script directory", file=sys.stderr)
+        sys.exit(1)
+    
+    if args.template is None:
+        print("Error: No .j2 template file found in script directory", file=sys.stderr)
+        sys.exit(1)
     
     # Load configuration
     try:
