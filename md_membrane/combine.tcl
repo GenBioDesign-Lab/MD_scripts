@@ -1,18 +1,19 @@
+#Usage: vmd -e combine.tcl
 package require psfgen
 
 # Reset PSFGen
 resetpsf
 
 # Read the first structure (CNT)
-readpsf cnt666.psf
-coordpdb cnt666_centered.pdb
+readpsf 2mlt_mem.psf
+coordpdb 2mlt_mem.pdb
 
 # Read the second structure (membrane) and merge it
-readpsf mem70.psf
-coordpdb mem70_cleaned.pdb
+readpsf mem6060.psf
+coordpdb mem6060.pdb
 
 # Write the merged system
-writepsf cnt_mem.psf
-writepdb cnt_mem.pdb
+writepsf 2mlt_mem.psf
+writepdb 2mlt_mem.pdb
 
 exit
