@@ -1,4 +1,4 @@
-# Ultra-simple PSF builder for homo oligomers
+#PSF builder for homo oligomers
 # Usage: vmd -dispdev text -e psf_homo.tcl
 
 # ====== CONFIGURATION ======
