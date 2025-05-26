@@ -7,7 +7,7 @@
 package require psfgen
 
 # Set topology directory path
-set input_path "/data01/genbiolab/jiyun/data/toppar"
+set input_path "/data01/genbiolab/mdanh/data/CHARMMFF/toppar"
 
 # Define list of topology files to use
 set topology_files {
@@ -29,12 +29,12 @@ psfgen_logfile "structure_preparation.log"
 pdbalias residue HIS HSD
 
 #change U to URA (for RNA)
-pdbalias residue U URA
+#pdbalias residue U URA
 
 #Build protein segment
 # Segment name max 4 characters
-segment PROT {
-    pdb 9bwz_aligned.pdb
+segment CNT {
+    pdb cnt_mem.pdb
 }
 
 #patch protein segment: patch [list] <patch residue name> <segid:resid>
@@ -43,7 +43,13 @@ segment PROT {
 pdbalias atom ILE CD1 CD
 
 #Read protein coordinates from PDB file
-coordpdb 9bwz_aligned.pdb PROT
+coordpdb cnt_mem.pdb CNT
+
+segment MEMB {
+    pdb cnt_mem.pdb
+}
+
+coordpdb cnt_mem.pdb MEMB
 
 #Build RNA segment
 #segment RNA {
@@ -56,8 +62,8 @@ coordpdb 9bwz_aligned.pdb PROT
 guesscoord
 
 # Write the PSF and PDB files
-writepsf test/test_psf.psf
-writepdb test/test_psf.pdb
+writepsf cnt_mem.psf
+writepdb cnt_mem_psf.pdb
 
 psfgen_logfile close
 exit

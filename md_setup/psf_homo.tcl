@@ -3,7 +3,7 @@
 
 # ====== CONFIGURATION ======
 # Input PDB file
-set input_pdb "9bwz_aligned.pdb"
+set input_pdb "test/cnt_mem.pdb"
 
 # Topology directory path
 set topdir "/data01/genbiolab/jiyun/data/toppar"
@@ -18,8 +18,8 @@ set topology_files {
 }
 
 # Output files
-set output_psf "9bwz.psf"
-set output_pdb "9bwz_psf.pdb"
+set output_psf "2mlt_mem.psf"
+set output_pdb "2mlt_mem.pdb"
 
 # Splitted chains directory
 set chains_dir "splitted_chains"
@@ -96,9 +96,5 @@ guesscoord
 puts "Writing output files..."
 writepsf $output_psf
 writepdb $output_pdb
-
-puts "Complete! Output files:"
-puts "  - $output_psf"
-puts "  - $output_pdb"
 
 exit
