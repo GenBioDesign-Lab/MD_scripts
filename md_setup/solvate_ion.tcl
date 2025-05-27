@@ -1,21 +1,22 @@
-# Usage: vmd -e solvate_ion.tcl -args <input.psf> <input.pdb> <output_name>
+# Usage: vmd -e solvate_ion.tcl -args <input.psf> <input.pdb> <output_dir>
 # Parse command-line arguments
 set inp_psf [lindex $argv 0]
 set inp_pdb [lindex $argv 1]
 
-# Set output prefix (default or user-specified)
+# Set output directory (default or user-specified)
 puts "Number of arguments: $argc"
 puts "Arguments: $argv"
 
 if {$argc >= 3} {
-    set out_prefix [lindex $argv 2]
-    puts "Using user-specified output prefix: $out_prefix"
-    set out_dir "${out_prefix}_ionized"
+    set out_dir [lindex $argv 2]
+    puts "Using user-specified output directory: $out_dir"
 } else {
-    set out_prefix "protein"
-    puts "Using default output prefix: $out_prefix"
     set out_dir "output_ionized"
+    puts "Using default output directory: $out_dir"
 }
+
+# Extract base name for file prefixes (remove any path components)
+set out_prefix [file tail $out_dir]
 
 # Create output directory if it does not exist
 file mkdir $out_dir
