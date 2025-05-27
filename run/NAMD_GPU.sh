@@ -11,7 +11,7 @@
 
 ml load namd/3.0.1-GPU
 cd /data01/genbiolab/mdanh/data/test_membrane/cnt_mem_ionized #where the namd config files are
-#namd3 +p24 +devices 0 01_Minimization.namd > 01_minimization.log
-namd3 +p24 +setcpuaffinity +devices 0 02_Equilibration.namd > 02_equilibration.log
-#namd3 +p24 +idlepoll +setcpuaffinity +devices 0 03_Production_npt.namd > 03_production_npt.log
+namd3 +p24 +idlepoll +setcpuaffinity +devices 0 minimization/01_Minimization.namd > minimization.log
+#namd3 +p24 +idlepoll +setcpuaffinity +devices 0 equilibration/02_Equilibration.namd > equilibration.log
+#namd3 +p24 +idlepoll +setcpuaffinity +devices 0 production/03_Production_npt.namd > production_npt.log
 
