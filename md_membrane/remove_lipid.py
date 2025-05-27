@@ -3,13 +3,13 @@ import numpy as np
 import argparse
 import warnings
 
-# Usage: python remove_lipid.py nanotube.pdb membrane.pdb membrane.psf -o cleaned_membrane -c complex.pdb
+# Usage: python remove_lipid.py nanotube.pdb membrane.pdb -o cleaned_membrane.pdb -c complex.pdb
 
 warnings.filterwarnings("ignore", category=UserWarning, module="MDAnalysis.coordinates.PDB")
 
-def remove_lipids_and_combine(nanotube_file, membrane_pdb, membrane_psf, output_file, complex_file=None, radius_factor=1.0, overlap_threshold=0.0):
+def remove_lipids_and_combine(nanotube_file, membrane_pdb, output_file, complex_file=None, radius_factor=1.0, overlap_threshold=0.0):
     # Load structures
-    mem = mda.Universe(membrane_psf, membrane_pdb)
+    mem = mda.Universe(membrane_pdb)
     tube = mda.Universe(nanotube_file)
 
     # Get nanotube dimensions
@@ -59,10 +59,8 @@ def remove_lipids_and_combine(nanotube_file, membrane_pdb, membrane_psf, output_
     # Save cleaned membrane only if specified
     keep_atoms = mem.atoms - bad_residues.atoms
     if output_file:
-        # Write both PDB and PSF files
-        keep_atoms.write(f"{output_file}.pdb")
-        keep_atoms.write(f"{output_file}.psf")
-        print(f"Cleaned membrane: {len(keep_atoms)} atoms → {output_file}.pdb and {output_file}.psf")
+        keep_atoms.write(output_file)
+        print(f"Cleaned membrane: {len(keep_atoms)} atoms → {output_file}")
     
     # Create complex if requested
     if complex_file:
@@ -74,14 +72,13 @@ def main():
     parser = argparse.ArgumentParser(description='Remove overlapping residues and create complex structure')
     parser.add_argument('nanotube', help='Nanotube PDB file')
     parser.add_argument('membrane_pdb', help='Membrane PDB file')
-    parser.add_argument('membrane_psf', help='Membrane PSF file')
-    parser.add_argument('-o', '--output', help='Cleaned membrane output prefix (will create .pdb and .psf files)')
+    parser.add_argument('-o', '--output', help='Cleaned membrane output (optional)')
     parser.add_argument('-c', '--complex', help='Complex structure output (optional)')
     parser.add_argument('-r', '--radius_factor', type=float, default=1.0, help='Radius scaling factor')
     parser.add_argument('-t', '--threshold', type=float, default=0.0, help='Overlap threshold (0.0-1.0)')
     
     args = parser.parse_args()
-    remove_lipids_and_combine(args.nanotube, args.membrane_pdb, args.membrane_psf, args.output, 
+    remove_lipids_and_combine(args.nanotube, args.membrane_pdb, args.output, 
                              args.complex, args.radius_factor, args.threshold)
 
 if __name__ == "__main__":
