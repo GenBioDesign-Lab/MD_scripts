@@ -55,7 +55,7 @@ def main():
     parser.add_argument('protein', help='Protein structure file')
     parser.add_argument('membrane', help='Membrane structure file')
     parser.add_argument('-o', '--output', required=True, help='Output file')
-    parser.add_argument('-d', '--distance', type=float, default=2.5, help='Distance cutoff (Å)')
+    parser.add_argument('-d', '--distance', type=float, default=3.0, help='Distance cutoff (Å)')
     
     args = parser.parse_args()
     remove_lipids_near_protein(args.protein, args.membrane, args.output, args.distance)

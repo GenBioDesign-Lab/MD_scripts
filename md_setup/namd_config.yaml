@@ -23,10 +23,10 @@ common:
   timestep: 2.0
   nonbonded_freq: 1
   full_elect_frequency: 2
-  cell_basis_vector1: "62.0    0.0    0.0"
-  cell_basis_vector2: "0.0   65.0    0.0"
-  cell_basis_vector3: "0.0    0.0   80.0"
-  cell_origin: "4.127   29.812  9.798"
+  cell_basis_vector1: "85.0    0.0    0.0"
+  cell_basis_vector2: "0.0   79.0    0.0"
+  cell_basis_vector3: "0.0    0.0   90.0"
+  cell_origin: "-17.604   -16.340  0.3"
   pme_grid_spacing: 1.0
   pme_grid_size_x: 45
   pme_grid_size_y: 45
