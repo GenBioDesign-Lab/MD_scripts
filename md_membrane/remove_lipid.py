@@ -7,7 +7,7 @@ import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="MDAnalysis.coordinates.PDB")
 
-def remove_lipids_and_combine(nanotube_file, membrane_pdb, output_file, complex_file=None, radius_factor=1.0, overlap_threshold=0.0):
+def remove_lipids_and_combine(nanotube_file, membrane_pdb, output_file, complex_file=None, radius_factor=1.1):
     # Load structures
     mem = mda.Universe(membrane_pdb)
     tube = mda.Universe(nanotube_file)
@@ -24,7 +24,7 @@ def remove_lipids_and_combine(nanotube_file, membrane_pdb, output_file, complex_
 
     # Select atoms to process (try lipids first, then all atoms)
     try:
-        atoms_to_check = mem.select_atoms("resname POPC or resname DOPE")
+        atoms_to_check = mem.select_atoms("resname POPC or resname POPE")
         if len(atoms_to_check) == 0:
             atoms_to_check = mem.atoms
             print("Processing all membrane atoms")
@@ -37,17 +37,13 @@ def remove_lipids_and_combine(nanotube_file, membrane_pdb, output_file, complex_
     dist_sq = (coords[:,0] - x_center)**2 + (coords[:,1] - y_center)**2
     inside_atoms = z_range_atoms[dist_sq < radius**2]
     
-    # Count overlapping residues
-    residue_counts = {}
+    # Remove any residue with ANY atom in the exclusion zone (zero tolerance)
+    overlapping_residues = set()
     for atom in inside_atoms:
-        res_id = atom.residue.resid
-        if res_id not in residue_counts:
-            residue_counts[res_id] = {"inside": 0, "total": len(atom.residue.atoms)}
-        residue_counts[res_id]["inside"] += 1
+        overlapping_residues.add(atom.residue.resid)
     
     # Mark residues for removal
-    bad_resids = [str(res_id) for res_id, counts in residue_counts.items() 
-                  if counts["inside"] / counts["total"] >= overlap_threshold]
+    bad_resids = [str(res_id) for res_id in overlapping_residues]
     
     if bad_resids:
         bad_residues = mem.select_atoms(f"resid {' '.join(bad_resids)}").residues
@@ -69,17 +65,16 @@ def remove_lipids_and_combine(nanotube_file, membrane_pdb, output_file, complex_
         print(f"Complex: {len(combined.atoms)} atoms → {complex_file}")
 
 def main():
-    parser = argparse.ArgumentParser(description='Remove overlapping residues and create complex structure')
+    parser = argparse.ArgumentParser(description='Remove overlapping residues and create complex structure with no overlap')
     parser.add_argument('nanotube', help='Nanotube PDB file')
     parser.add_argument('membrane_pdb', help='Membrane PDB file')
     parser.add_argument('-o', '--output', help='Cleaned membrane output (optional)')
     parser.add_argument('-c', '--complex', help='Complex structure output (optional)')
-    parser.add_argument('-r', '--radius_factor', type=float, default=1.0, help='Radius scaling factor')
-    parser.add_argument('-t', '--threshold', type=float, default=0.0, help='Overlap threshold (0.0-1.0)')
+    parser.add_argument('-r', '--radius_factor', type=float, default=1.1, help='Radius scaling factor (default: 1.1)')
     
     args = parser.parse_args()
     remove_lipids_and_combine(args.nanotube, args.membrane_pdb, args.output, 
-                             args.complex, args.radius_factor, args.threshold)
+                             args.complex, args.radius_factor)
 
 if __name__ == "__main__":
     main()

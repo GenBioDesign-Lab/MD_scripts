@@ -51,4 +51,4 @@ autoionize -psf $out_dir/${out_prefix}_solv.psf \
 
 # Creates: <out_dir>/<out_prefix>_ionized.psf / <out_dir>/<out_prefix>_ionized.pdb
 
-quit
+exit

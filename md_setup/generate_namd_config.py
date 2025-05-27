@@ -13,13 +13,11 @@ def load_config(config_file):
         return yaml.safe_load(f)
 
 
-def render_template(template_file, config, stage, temperature=None):
+def render_template(template_file, config, stage, temperature=None, stage_dirs=None):
     """Render the Jinja2 template with the configuration for the specified stage and temperature."""
-    # Load the template from file
     template_dir = os.path.dirname(os.path.abspath(template_file))
     template_name = os.path.basename(template_file)
     
-    # Setup Jinja2 environment
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(template_dir),
         trim_blocks=True,
@@ -27,14 +25,23 @@ def render_template(template_file, config, stage, temperature=None):
     )
     template = env.get_template(template_name)
     
-    # Merge common config with stage-specific config
     merged_config = {**config['common'], **config[stage]}
     
-    # Override temperature if specified
     if temperature is not None:
         merged_config['temperature'] = temperature
     
-    # Render template
+    # Update file paths for cross-directory references
+    if stage_dirs:
+        if stage == 'equilibration':
+            rel_path = os.path.relpath(stage_dirs['minimization'], stage_dirs['equilibration'])
+            merged_config['coordinates_file'] = os.path.join(rel_path, "final_min.coor")
+            merged_config['extended_system_file'] = os.path.join(rel_path, "final_min.xsc")
+        elif stage == 'production':
+            rel_path = os.path.relpath(stage_dirs['equilibration'], stage_dirs['production'])
+            merged_config['coordinates_file'] = os.path.join(rel_path, "final_eq.coor")
+            merged_config['extended_system_file'] = os.path.join(rel_path, "final_eq.xsc")
+            merged_config['velocities_file'] = os.path.join(rel_path, "final_eq.vel")
+    
     return template.render(**merged_config)
 
 
@@ -45,90 +52,50 @@ def save_file(content, output_path):
     print(f"Created NAMD configuration file: {output_path}")
 
 
-def get_psf_basename(psf_path):
-    """Extract the base name of the PSF file without extension."""
-    return os.path.splitext(os.path.basename(psf_path))[0]
-
-
 def discover_files():
     """Discover .yaml and .j2 files in the script's directory."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Find .yaml files
     yaml_files = glob.glob(os.path.join(script_dir, "*.yaml")) + glob.glob(os.path.join(script_dir, "*.yml"))
-    
-    # Find .j2 files
     j2_files = glob.glob(os.path.join(script_dir, "*.j2"))
-    
-    # Get the first file of each type, or None if not found
-    config_file = yaml_files[0] if yaml_files else None
-    template_file = j2_files[0] if j2_files else None
-    
-    return config_file, template_file
+    return yaml_files[0] if yaml_files else None, j2_files[0] if j2_files else None
 
 
 def main():
-    # Discover default files in script directory
     default_config, default_template = discover_files()
     
     parser = argparse.ArgumentParser(description='Generate NAMD configuration files from templates')
     parser.add_argument('--config', '-c', default=default_config,
-                        help=f'Path to YAML configuration file (default: {os.path.basename(default_config) if default_config else "auto-discover"})')
+                        help=f'Path to YAML configuration file (default: auto-discover)')
     parser.add_argument('--template', '-t', default=default_template,
-                        help=f'Path to Jinja2 template file (default: {os.path.basename(default_template) if default_template else "auto-discover"})')
-    parser.add_argument('--output-dir', '-o', default='.',
-                        help='Directory to save generated NAMD files (default: current directory)')
+                        help=f'Path to Jinja2 template file (default: auto-discover)')
+    parser.add_argument('--output-dir', '-o', default='namd',
+                        help='Directory to save generated NAMD files (default: namd)')
     parser.add_argument('--stages', '-s', nargs='+', 
                         choices=['minimization', 'equilibration', 'production', 'all'],
-                        default=['all'],
-                        help='Stages to generate (default: all)')
+                        default=['all'], help='Stages to generate (default: all)')
     parser.add_argument('--temperatures', '-T', nargs='+', type=float,
-                        help='List of temperatures to generate files for (default: use temperature from config)')
+                        help='List of temperatures to generate files for')
     parser.add_argument('--temp-prefix', '-p', action='store_true',
                         help='Add temperature as prefix to output directories (T{temp}_)')
-    parser.add_argument('--no-organize', '-n', action='store_true',
-                        help='Disable automatic organization into subfolder based on PSF name')
     
     args = parser.parse_args()
     
-    # Check if required files were found
-    if args.config is None:
-        print("Error: No .yaml/.yml configuration file found in script directory", file=sys.stderr)
+    if args.config is None or args.template is None:
+        print("Error: Required .yaml/.yml config or .j2 template file not found", file=sys.stderr)
         sys.exit(1)
     
-    if args.template is None:
-        print("Error: No .j2 template file found in script directory", file=sys.stderr)
-        sys.exit(1)
-    
-    # Load configuration
     try:
         config = load_config(args.config)
     except Exception as e:
         print(f"Error loading configuration file: {e}", file=sys.stderr)
         sys.exit(1)
     
-    # Create output directory if it doesn't exist
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
     
-    # Get PSF basename for subfolder (default behavior)
-    psf_basename = None
-    if 'structure_file' in config['common'] and not args.no_organize:
-        psf_basename = get_psf_basename(config['common']['structure_file'])
+    stages_to_generate = ['minimization', 'equilibration', 'production'] if 'all' in args.stages else args.stages
+    temperatures = args.temperatures if args.temperatures else [None]
     
-    # Determine which stages to generate
-    stages_to_generate = []
-    if 'all' in args.stages:
-        stages_to_generate = ['minimization', 'equilibration', 'production']
-    else:
-        stages_to_generate = args.stages
-    
-    # Get temperatures to use
-    temperatures = [None]  # Default to using config temperature
-    if args.temperatures:
-        temperatures = args.temperatures
-    
-    # Define stage filenames
     stage_filenames = {
         'minimization': '01_Minimization.namd',
         'equilibration': '02_Equilibration.namd',
@@ -136,29 +103,23 @@ def main():
     }
     
     for temp in temperatures:
-        # Create temperature-specific directory if multiple temperatures
+        current_output_dir = output_dir
         if temp is not None and (len(temperatures) > 1 or args.temp_prefix):
-            temp_dir = output_dir / f"T{int(temp)}"
-            temp_dir.mkdir(exist_ok=True)
-            current_output_dir = temp_dir
-        else:
-            current_output_dir = output_dir
+            current_output_dir = output_dir / f"T{int(temp)}"
+            current_output_dir.mkdir(exist_ok=True)
         
-        # Create PSF-named directory (default behavior)
-        if psf_basename:
-            psf_dir = current_output_dir / psf_basename
-            psf_dir.mkdir(exist_ok=True)
-            current_output_dir = psf_dir
+        # Create stage directories
+        stage_dirs = {}
+        for stage in stages_to_generate:
+            stage_dir = current_output_dir / stage
+            stage_dir.mkdir(exist_ok=True, parents=True)
+            stage_dirs[stage] = stage_dir
         
+        # Generate configuration files
         for stage in stages_to_generate:
             try:
-                # Render template for this stage and temperature
-                content = render_template(args.template, config, stage, temp)
-                
-                # Determine output path
-                output_path = current_output_dir / stage_filenames[stage]
-                
-                # Save to output file
+                content = render_template(args.template, config, stage, temp, stage_dirs)
+                output_path = stage_dirs[stage] / stage_filenames[stage]
                 save_file(content, output_path)
             except Exception as e:
                 print(f"Error generating {stage} configuration for temperature {temp}: {e}", file=sys.stderr)
