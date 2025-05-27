@@ -2,161 +2,112 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import sys
-import re
-
 #Usage: python extract_and_plot_from_log_file.py <log_file>
-
 def select_column(available_columns):
     """Display column options and get user selection"""
-    print("\n=== Available columns to plot ===")
+    print("\nAvailable columns:")
     for i, col in enumerate(available_columns):
         print(f"{i}: {col}")
     
-    print("\nType the number of the column you want to plot and press Enter")
-    print("Type 'exit' to quit the program")
-    
     while True:
         try:
-            user_input = input("\nYour choice: ")
-            if user_input.lower() == 'exit':
+            choice = input("\nEnter column number (or 'exit'): ")
+            if choice.lower() == 'exit':
                 return None
-            
-            column_index = int(user_input)
-            if 0 <= column_index < len(available_columns):
-                return column_index
-            else:
-                print(f"Please enter a number between 0 and {len(available_columns)-1}")
+            idx = int(choice)
+            if 0 <= idx < len(available_columns):
+                return idx
+            print(f"Enter number between 0 and {len(available_columns)-1}")
         except ValueError:
-            print("Please enter a valid number")
+            print("Enter a valid number")
 
 def extract_and_plot_namd_data(log_file):
     try:
-        print(f"\nReading NAMD log file: {log_file}")
+        print(f"Reading: {log_file}")
         
-        # Get the directory and base filename of the log file
-        log_dir = os.path.dirname(log_file)
-        if log_dir == '':
-            log_dir = '.'
+        log_dir = os.path.dirname(log_file) or '.'
         log_basename = os.path.splitext(os.path.basename(log_file))[0]
         
-        # Read the log file
         with open(log_file, 'r') as f:
-            log_content = f.readlines()
+            lines = f.readlines()
         
-        # Find the ETITLE line to get column headers
-        etitle_line = ''
-        for line in log_content:
+        # Find headers
+        headers = []
+        for line in lines:
             if line.startswith('ETITLE:'):
-                etitle_line = line
+                headers = line.strip().split()[1:]
                 break
         
-        if not etitle_line:
-            print("Error: ETITLE line not found in the log file")
+        if not headers:
+            print("Error: ETITLE line not found")
             return
         
-        # Extract headers from ETITLE line
-        headers = etitle_line.strip().split()[1:]
-        
-        # Extract data from ENERGY lines
-        energy_data = []
-        for line in log_content:
+        # Extract data
+        data = []
+        for line in lines:
             if line.startswith('ENERGY:'):
-                values = line.strip().split()[1:]
-                # Convert string values to float
-                values = [float(val) for val in values]
-                energy_data.append(values)
+                values = [float(val) for val in line.strip().split()[1:]]
+                data.append(values)
         
-        if not energy_data:
-            print("Error: No ENERGY data found in the log file")
+        if not data:
+            print("Error: No ENERGY data found")
             return
         
-        # Create DataFrame
-        df = pd.DataFrame(energy_data, columns=headers)
+        df = pd.DataFrame(data, columns=headers)
         
-        # Create output directory
+        # Save CSV
         output_dir = os.path.join(log_dir, "output")
         os.makedirs(output_dir, exist_ok=True)
+        csv_file = os.path.join(output_dir, f"{log_basename}.csv")
+        df.to_csv(csv_file, index=False)
+        print(f"Data saved: {csv_file}")
         
-        # Save the extracted data to CSV
-        csv_filename = os.path.join(output_dir, f"{log_basename}.csv")
-        df.to_csv(csv_filename, index=False)
-        print(f"\nExtracted data saved to: {csv_filename}")
-        
-        # Add Time column if TS exists
+        # Setup x-axis
         if 'TS' in df.columns:
-            df['Time (ns)'] = df['TS'] * 2e-6  # TS * 2fs / 1e6 = ns
-            # Use Time as x-axis if available
-            x_column = 'Time (ns)'
-            # Get columns for plotting (excluding TS and Time since we use Time for x-axis)
-            available_columns = [col for col in df.columns if col != 'TS' and col != 'Time (ns)']
+            df['Time (ns)'] = df['TS'] * 2e-6
+            x_col = 'Time (ns)'
+            plot_cols = [col for col in df.columns if col not in ['TS', 'Time (ns)']]
         else:
-            # If no TS column, use the first column as x-axis
-            x_column = headers[0]
-            available_columns = [col for col in df.columns if col != x_column]
+            x_col = headers[0]
+            plot_cols = [col for col in df.columns if col != x_col]
         
-        # Main plotting loop - continue until user exits
+        # Plot loop
         while True:
-            # Get column selection from user
-            column_index = select_column(available_columns)
+            col_idx = select_column(plot_cols)
+            if col_idx is None:
+                break
             
-            # Exit if user chose to quit
-            if column_index is None:
-                print("Exiting...")
-                return
+            y_col = plot_cols[col_idx]
+            print(f"Plotting {y_col} vs {x_col}")
             
-            # Get the selected column name
-            selected_column = available_columns[column_index]
-            print(f"\nPlotting {selected_column} vs {x_column}")
-            
-            # Create the plot
             plt.figure(figsize=(10, 6))
-            plt.plot(df[x_column], df[selected_column], linewidth=2)
-            plt.xlabel(x_column, fontsize=12)
-            plt.ylabel(selected_column, fontsize=12)
-            plt.title(f'{selected_column} vs {x_column}', fontsize=14)
-            plt.grid(True, linestyle='--', alpha=0.7)
-            plt.tight_layout()
+            plt.plot(df[x_col], df[y_col])
+            plt.xlabel(x_col)
+            plt.ylabel(y_col)
+            plt.title(f'{y_col} vs {x_col}')
+            plt.grid(True, alpha=0.3)
             
-            # Save the plot automatically to the same folder as the log file
-            output_dir = os.path.join(log_dir, "output")
-            os.makedirs(output_dir, exist_ok=True)
-            plot_filename = os.path.join(output_dir, f"{log_basename}_{selected_column.replace(' ', '_')}.png")
-            plt.savefig(plot_filename, dpi=300)
-            print(f"\nPlot saved to: {plot_filename}")
-            
-            print("\nShowing plot... (close the plot window to return to menu)")
-            # Show the plot (will return when user closes plot window)
+            plot_file = os.path.join(output_dir, f"{log_basename}_{y_col.replace(' ', '_')}.png")
+            plt.savefig(plot_file, dpi=300)
+            print(f"Plot saved: {plot_file}")
             plt.show()
-            
-            print("\nReturning to column selection menu...")
     
     except FileNotFoundError:
-        print(f"Error: Could not find the file '{log_file}'")
+        print(f"File not found: {log_file}")
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error: {e}")
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
-        print("\nNAMD Log Data Plotter")
-        print("\nUsage:")
-        print("  python extract_log_data.py path/to/logfile.log")
-        print("\nOptions:")
-        print("  -h, --help          Show this help message")
+        print("Usage: python extract_and_plot_from_log_file.py <log_file>")
         return
     
-    # Get log file from command line argument
     if len(sys.argv) > 1:
-        log_file = sys.argv[1]
-        extract_and_plot_namd_data(log_file)
+        extract_and_plot_namd_data(sys.argv[1])
     else:
-        print("\nUsage:")
-        print("  python extract_log_data.py path/to/logfile.log")
-        
-        log_file = input("\nEnter the path to your NAMD log file: ")
+        log_file = input("Enter NAMD log file path: ")
         if log_file:
             extract_and_plot_namd_data(log_file)
-        else:
-            print("No file provided. Exiting.")
 
 if __name__ == "__main__":
     main() 
