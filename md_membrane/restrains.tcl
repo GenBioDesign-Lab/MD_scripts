@@ -1,4 +1,4 @@
-########## user-adjustable constants ##########
+########## adjustable constants ##########
 set outfile       "restraints_POPC.dihe"
 set phi0_dihe     0.0
 set phi0_glycerol -120.0
