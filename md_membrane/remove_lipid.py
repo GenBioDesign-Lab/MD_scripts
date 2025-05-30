@@ -7,7 +7,7 @@ import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="MDAnalysis.coordinates.PDB")
 
-def remove_lipids_and_combine(nanotube_file, membrane_pdb, output_file, complex_file=None, radius_factor=1.1, buffer_distance=2.0):
+def remove_lipids_and_combine(nanotube_file, membrane_pdb, output_file, complex_file=None, radius_factor=1.1, buffer_distance=3.5):
     # Load structures
     mem = mda.Universe(membrane_pdb)
     tube = mda.Universe(nanotube_file)
@@ -75,7 +75,7 @@ def main():
     parser.add_argument('-o', '--output', help='Cleaned membrane output (optional)')
     parser.add_argument('-c', '--complex', help='Complex structure output (optional)')
     parser.add_argument('-r', '--radius_factor', type=float, default=1.1, help='Radius scaling factor (default: 1.1)')
-    parser.add_argument('-b', '--buffer_distance', type=float, default=2.0, help='Buffer distance in Å (default: 2.0)')
+    parser.add_argument('-b', '--buffer_distance', type=float, default=3.5, help='Buffer distance in Å (default: 2.0)')
     
     args = parser.parse_args()
     remove_lipids_and_combine(args.nanotube, args.membrane_pdb, args.output, 
