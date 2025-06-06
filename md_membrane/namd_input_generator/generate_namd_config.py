@@ -13,6 +13,12 @@ def load_config(config_file):
         return yaml.safe_load(f)
 
 
+def bool_to_yesno(value):
+    """Convert boolean values to yes/no strings."""
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    return value
+
 def render_template(template_file, config, stage, temperature=None, stage_dirs=None):
     """Render the Jinja2 template with the configuration for the specified stage and temperature."""
     template_dir = os.path.dirname(os.path.abspath(template_file))
@@ -23,6 +29,8 @@ def render_template(template_file, config, stage, temperature=None, stage_dirs=N
         trim_blocks=True,
         lstrip_blocks=True
     )
+    # Add custom filter for boolean to yes/no conversion
+    env.filters['yesno'] = bool_to_yesno
     template = env.get_template(template_name)
     
     merged_config = {**config['common'], **config[stage]}

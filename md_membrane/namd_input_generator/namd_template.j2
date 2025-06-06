@@ -88,8 +88,9 @@ langevinHydrogen   off    ;# don't couple langevin bath to hydrogens
 
 # Constant Pressure Control (variable volume)
 useGroupPressure   yes ;# needed for rigidBonds
-useFlexibleCell    no
-useConstantArea    no
+useFlexibleCell    {{ use_flexible_cell|yesno }}  ;# yes for membrane systems
+useConstantRatio   {{ use_constant_ratio|yesno }}
+useConstantArea    {{ use_constant_area|yesno }}
 
 langevinPiston        on
 langevinPistonTarget  {{ langevin_piston_target }} ;# in bar -> 1 atm
@@ -117,7 +118,9 @@ binaryrestart      no
 #############################################################
 ## EXTRA PARAMETERS                                        ##
 #############################################################
-
+{% if stage == 'equilibration' %}
+margin             {{ margin }}
+{% endif %}
 
 #############################################################
 ## EXECUTION SCRIPT                                        ##
