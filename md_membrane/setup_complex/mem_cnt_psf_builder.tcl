@@ -52,13 +52,12 @@ readpsf cnt_psf.psf
 coordpdb cnt_psf.pdb
 
 # Read the second structure (membrane) and merge it
-readpsf mem_8080_nowater.psf
-coordpdb cleaned_mem.pdb
+readpsf rebuilt_mem.psf
+coordpdb rebuilt_mem.pdb
 
 # Write the merged system
 writepsf cnt_mem.psf
 writepdb cnt_mem.pdb
-
 psfgen_logfile close
 
 exit

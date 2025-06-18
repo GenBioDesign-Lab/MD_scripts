@@ -20,8 +20,10 @@ mol addfile $inp_pdb
 #  -t 10   : add 10 Å padding in every direction
 #  -x,-y,-z, +x,+y,+z : add padding in specific directions
 #  -o ...  : prefix for output files
-solvate $inp_psf $inp_pdb -t 10 -o $out_dir/${out_dir}_solv
-
+solvate $inp_psf $inp_pdb \
+ -x 0 -y 0 -z 10 \
+ +x 0 +y 0 +z 10 \
+ -o $out_dir/${out_dir}_solv
 # The call creates: <out_dir>/<out_dir>_solv.psf / <out_dir>/<out_dir>_solv.pdb
 # Keep only the solvated molecule in memory
 mol delete top
@@ -47,7 +49,7 @@ mol delete top
 source ../combine.tcl
 
 # ----‑‑‑ 4. REMOVE WATER NEAR CNT ------------------------------------------
-# Remove water molecules within 5 Å of the carbon nanotube
+# Remove water molecules within 10 Å of the carbon nanotube
 mol new      $out_dir/${out_dir}_cnt_mem_water.psf
 mol addfile  $out_dir/${out_dir}_cnt_mem_water.pdb
 
