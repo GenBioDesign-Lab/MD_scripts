@@ -8,6 +8,8 @@ import warnings
 # Suppress MDAnalysis PDB format warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="MDAnalysis.coordinates.PDB")
 
+# We need to rotate the CNT structure 90 degrees around the z-axis to make it parallel to the membrane (as the script create cnt laid in the x-y plane)
+
 def rotate_structure(structure, x_angle, y_angle, z_angle):
     """
     Rotate a structure around x, y, and z axes by the specified angles in degrees.
