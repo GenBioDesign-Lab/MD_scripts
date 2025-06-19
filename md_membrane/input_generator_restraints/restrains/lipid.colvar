@@ -11,7 +11,7 @@ colvar {
          dummyAtom ( 0.000, 0.000, 0.000 )
       }
       main {
-         atomsFile      restraints/popc_head_upper.ref 
+         atomsFile      /data01/genbiolab/mdanh/data/MD_scripts/working/check/restraints/popc_head_upper.ref
          atomsCol       B
          atomsColValue  1.0
       }
@@ -31,10 +31,10 @@ colvar {
          dummyAtom ( 0.000, 0.000, 0.000 )
       }
       main {
-         atomsFile      restraints/popc_head_lower.ref 
+         atomsFile      /data01/genbiolab/mdanh/data/MD_scripts/working/check/restraints/popc_head_lower.ref
          atomsCol       B
          atomsColValue  1.0
-      }ß
+      }
    }
 }
 

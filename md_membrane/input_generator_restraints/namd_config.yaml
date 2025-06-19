@@ -1,0 +1,139 @@
+# Common settings
+common:
+  structure_file: "/data01/genbiolab/mdanh/data/MD_scripts/working/test/cnt_mem_ionized/cnt_mem_ionized.psf"
+  parameters_file: "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36m_prot.prm"
+  # Uncomment and modify this to use multiple parameter files
+  parameters_files:
+     - "/data01/genbiolab/mdanh/data/CHARMMFF/cnt_ff/cnt_6_40_oh_CHARMM.prm"
+     - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36m_prot.prm"
+     - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36_carb.prm"
+     - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36_lipid.prm"
+     - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36_na.prm"
+     - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36_cgenff.prm"
+     - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/toppar_water_ions_namd.str"
+
+  # Default temperature - can be overridden via command line for multiple temperature runs
+  # Use --temperatures option to generate files for multiple temperatures
+  # e.g., --temperatures 300 310 320
+  temperature: 300
+  cutoff: 12.0
+  switch_dist: 10.0
+  pairlist_dist: 14.0
+  timestep: 2.0
+  nonbonded_freq: 1
+  full_elect_frequency: 2
+  cell_basis_vector1: "76.71    0.0    0.0"
+  cell_basis_vector2: "0.0   80.82    0.0"
+  cell_basis_vector3: "0.0    0.0   76.53"
+  cell_origin: "-13.292   -12.999  0.194"
+  pme_grid_spacing: 1.0
+  pme_grid_size_x: 45
+  pme_grid_size_y: 45
+  pme_grid_size_z: 100
+  langevin_damping: 1
+  langevin_piston_target: 1.01325
+  langevin_piston_period: 100.0
+  langevin_piston_decay: 50.0
+  first_timestep: 0
+  # Membrane system settings
+  use_flexible_cell: true
+  use_constant_ratio: false
+  use_constant_area: true
+
+# Minimization stage config
+minimization:
+  stage: minimization
+  job_description: "Minimization of molecules"
+  coordinates_file: "/data01/genbiolab/mdanh/data/MD_scripts/working/test/cnt_mem_ionized/cnt_mem_ionized_aligned.pdb"
+  output_name: "final_min"
+  steps_per_cycle: 10
+  restart_freq: 500
+  dcd_freq: 200
+  output_energies: 100
+  output_pressure: 100
+  num_minimize_steps: 20000
+
+# Multi-stage equilibration configuration
+equilibration_stages:
+  # Number of equilibration stages (can be easily modified)
+  num_stages: 6
+  # Base configuration for all equilibration stages
+  base_config:
+    job_description: "Membrane equilibration with restraints"
+    steps_per_cycle: 20
+    restart_freq: 1000
+    dcd_freq: 500
+    output_energies: 100
+    output_pressure: 100
+    num_steps: 5000
+    margin: 3
+    timestep: 0.5  # Reduced timestep for equilibration
+  
+  # Force constant schedule for membrane restraints
+  # Values will be applied in sequence for each stage
+  force_constants:
+    membrane_planar: [10.0, 10.0, 5.0, 2.0, 1.0, 0.0]
+    membrane_dihedral: [500, 200, 100, 50, 20, 0]
+  
+  # Specific settings for each stage (optional overrides)
+  stage_specific:
+    eq1:
+      job_description: "Initial equilibration with strong restraints"
+      num_steps: 125000
+    eq2:
+      job_description: "Equilibration with reduced planar restraints"
+      num_steps: 125000
+    eq3:
+      job_description: "Equilibration with moderate restraints"
+      num_steps: 125000
+    eq4:
+      job_description: "Equilibration with weak restraints"
+      num_steps: 125000
+    eq5:
+      job_description: "Equilibration with minimal restraints"
+      num_steps: 125000
+    eq6:
+      job_description: "Final equilibration without restraints"
+      num_steps: 100000
+      timestep: 2.0  # Return to production timestep
+
+# Single equilibration stage config (kept for backward compatibility)
+equilibration:
+  stage: equilibration
+  job_description: "Single stage equilibration"
+  coordinates_file: "final_min.coor"
+  extended_system_file: "final_min.xsc"
+  output_name: "final_eq"
+  steps_per_cycle: 20
+  restart_freq: 500
+  dcd_freq: 500
+  output_energies: 500
+  output_pressure: 500
+  num_steps: 500000
+  margin: 3
+
+# Production stage config
+production:
+  stage: production
+  job_description: "NPT dynamics"
+  coordinates_file: "final_eq6.coor"  # Uses last equilibration stage
+  extended_system_file: "final_eq6.xsc"
+  velocities_file: "final_eq6.vel"
+  output_name: "final_NPT"
+  nonbonded_scaling: 0.833
+  steps_per_cycle: 20
+  restart_freq: 10000
+  dcd_freq: 5000
+  xst_freq: 5000
+  output_energies: 5000
+  output_pressure: 5000
+  num_steps: 500000
+
+# Membrane restraints configuration
+membrane_restraints:
+  enabled: true
+  # Custom restraint file paths
+  colvar_file: "/data01/genbiolab/mdanh/data/MD_scripts/restrains/lipid.colvar"
+  upper_leaflet_ref: "/data01/genbiolab/mdanh/data/MD_scripts/working/check/restraints/popc_head_upper.ref"
+  lower_leaflet_ref: "/data01/genbiolab/mdanh/data/MD_scripts/working/check/restraints/popc_head_lower.ref"
+  dihedral_file: "/data01/genbiolab/mdanh/data/MD_scripts/working/check/restraints/popc_dihe" 
