@@ -47,3 +47,5 @@ foreach resid $residList {
 
 close $fh
 puts ">> wrote restraints to $outfile" 
+
+quit
