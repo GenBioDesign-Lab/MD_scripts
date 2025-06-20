@@ -38,7 +38,7 @@ common:
   # Membrane system settings
   use_flexible_cell: true
   use_constant_ratio: false
-  use_constant_area: true
+  use_constant_area: false
 
 # Minimization stage config
 minimization:
