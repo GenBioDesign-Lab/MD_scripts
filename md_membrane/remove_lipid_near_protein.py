@@ -40,7 +40,12 @@ def remove_lipids_near_protein(protein_file, membrane_file, output_file, cutoff_
         return
     
     # Remove close residues
-    atoms_to_remove = sum([res.atoms for res in close_residues], mda.AtomGroup([], membrane_u))
+    # Start with an empty AtomGroup from the membrane universe and
+    # accumulate atoms from each residue using ``sum``.
+    atoms_to_remove = sum(
+        (res.atoms for res in close_residues),
+        membrane_u.atoms[0:0]
+    )
     atoms_to_keep = membrane_u.atoms - atoms_to_remove
     
     print(f"Removing {len(close_residues)} lipid molecules ({len(atoms_to_remove)} atoms)")
