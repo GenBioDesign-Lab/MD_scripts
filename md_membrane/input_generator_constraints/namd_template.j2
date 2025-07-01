@@ -43,7 +43,7 @@ temperature        $temperature
 
 # Force-Field Parameters
 exclude            scaled1-4
-oneFourScaling     1.0
+oneFourScaling     0.833333
 {% if stage == 'production' %}
 nonbondedScaling   {{ nonbonded_scaling }}
 {% endif %}
@@ -54,14 +54,22 @@ pairlistdist       {{ pairlist_dist }}
 
 # Integrator Parameters
 {% if stage == 'equilibration' or stage.startswith('eq') %}
-timestep           {{ timestep if timestep is defined else 1.0 }}  ;# reduced timestep for equilibration
+timestep           {{ timestep if timestep is defined else 1.0 }}
 {% else %}
-timestep           {{ timestep }}  ;# 2fs/step
+timestep           {{ timestep }}
 {% endif %}
-rigidBonds         all  ;# needed for 2fs steps
+rigidBonds         all
 nonbondedFreq      {{ nonbonded_freq }}
 fullElectFrequency {{ full_elect_frequency }}  
 stepspercycle      {{ steps_per_cycle }}
+
+{% if stage == 'equilibration' or stage.startswith('eq') %}
+#Constant temperature reassignment
+{% if reassign_freq is defined %}
+reassignFreq    {{ reassign_freq }}
+reassignTemp    $temperature
+{% endif %}
+{% endif %}
 
 # Periodic Boundary Conditions
 cellBasisVector1   {{ cell_basis_vector1 }}
@@ -73,27 +81,26 @@ cellOrigin         {{ cell_origin }}
 PME                yes
 PMEGridSpacing     {{ pme_grid_spacing }}
 
-#manual grid definition
-#PMEGridSizeX      {{ pme_grid_size_x }}
-#PMEGridSizeY      {{ pme_grid_size_y }}
-#PMEGridSizeZ      {{ pme_grid_size_z }}
-
 wrapAll            on
 
 # Constant Temperature Control
-langevin           on    ;# do langevin dynamics
-langevinDamping    {{ langevin_damping }}     ;# damping coefficient (gamma) of 1/ps
+langevin           on
+{% if stage == 'production' %}
+langevinDamping    {{ langevin_damping_production if langevin_damping_production is defined else 1 }}
+{% else %}
+langevinDamping    {{ langevin_damping if langevin_damping is defined else 10 }}
+{% endif %}
 langevinTemp       $temperature
-langevinHydrogen   off    ;# don't couple langevin bath to hydrogens
+langevinHydrogen   off
 
 # Constant Pressure Control (variable volume)
-useGroupPressure   yes ;# needed for rigidBonds
-useFlexibleCell    {{ use_flexible_cell|yesno }}  ;# yes for membrane systems
+useGroupPressure   yes
+useFlexibleCell    {{ use_flexible_cell|yesno }}
 useConstantRatio   {{ use_constant_ratio|yesno }}
 useConstantArea    {{ use_constant_area|yesno }}
 
 langevinPiston        on
-langevinPistonTarget  {{ langevin_piston_target }} ;# in bar -> 1 atm
+langevinPistonTarget  {{ langevin_piston_target }}
 langevinPistonPeriod  {{ langevin_piston_period }}
 langevinPistonDecay   {{ langevin_piston_decay }}
 langevinPistonTemp    $temperature
@@ -104,7 +111,7 @@ outputName         $outputname
 XSTfile            $outputname.xst
 {% endif %}
 
-restartfreq        {{ restart_freq }}     ;#500steps = 1ps
+restartfreq        {{ restart_freq }}
 dcdfreq            {{ dcd_freq }}
 {% if stage == 'production' %}
 XSTfreq            {{ xst_freq }}
@@ -116,32 +123,26 @@ binaryoutput       no
 binaryrestart      no
 
 #############################################################
-## EXTRA PARAMETERS                                        ##
+## RESTRAINTS AND CONSTRAINTS                             ##
 #############################################################
 
 {% if use_restraints and (stage in ['minimization', 'equilibration'] or stage.startswith('eq')) %}
-# Membrane restraints
-{% if membrane_planar_fc is defined and membrane_planar_fc > 0 and colvar_file is defined %}
-# Planar restraints for membrane leaflets
-colvars on
-exec sed -e "s/\$fc/{{ membrane_planar_fc }}/g" {{ colvar_file }} > $outputname.colvars
-colvarsConfig $outputname.colvars
+{% if constraints is defined and constraints.enabled %}
+# Constraints for CNT/membrane system
+constraints on
+conskfile   {{ constraints.cons_pdb }}
+conskcol    {{ constraints.cons_col }}
+consref     {{ constraints.cons_pdb }}
+consexp     {{ constraints.cons_exp }}
 {% endif %}
-
-{% if membrane_dihedral_fc is defined and membrane_dihedral_fc > 0 and dihedral_file is defined %}
-# Dihedral restraints for lipid tails
-exec sed -e "s/\$FC/{{ membrane_dihedral_fc }}/g" {{ dihedral_file }} > $outputname.dihe
-extraBonds yes
-extraBondsFile $outputname.dihe
-{% endif %}
-
-{% if membrane_planar_fc is defined and membrane_planar_fc == 0 and membrane_dihedral_fc is defined and membrane_dihedral_fc == 0 %}
-# No restraints in this stage
-{% endif %}
+{% else %}
+# Restraints disabled for {{ stage }} stage
 {% endif %}
 
 {% if stage == 'equilibration' or stage.startswith('eq') %}
+{% if margin is defined %}
 margin             {{ margin }}
+{% endif %}
 {% endif %}
 
 #############################################################
@@ -149,10 +150,7 @@ margin             {{ margin }}
 #############################################################
 
 {% if stage == 'minimization' %}
-# Minimization
 minimize           {{ num_minimize_steps }}
 {% else %}
-# {% if stage == 'equilibration' or stage.startswith('eq') %}Equilibration{% else %}Production{% endif %}
-
-numsteps           {{ num_steps }}        # Number of integration steps
+numsteps           {{ num_steps }}
 {% endif %} 

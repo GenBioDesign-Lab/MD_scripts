@@ -21,6 +21,7 @@ def bool_to_yesno(value):
         return "yes" if value else "no"
     return value
 
+
 def render_template(template_file, config, stage, temperature=None, stage_dirs=None, use_restraints=False, eq_stage_num=None):
     """Render the Jinja2 template with the configuration for the specified stage and temperature."""
     template_dir = os.path.dirname(os.path.abspath(template_file))
@@ -43,24 +44,11 @@ def render_template(template_file, config, stage, temperature=None, stage_dirs=N
         eq_config = config.get('equilibration_stages', {})
         base_config = eq_config.get('base_config', {})
         stage_specific = eq_config.get('stage_specific', {}).get(stage, {})
-        force_constants = eq_config.get('force_constants', {})
         
         # Merge base config with stage-specific overrides
         merged_config.update(base_config)
         merged_config.update(stage_specific)
-        
-        # Add force constants for this stage
-        stage_index = eq_stage_num - 1  # Convert to 0-based index
-        if 'membrane_planar' in force_constants and stage_index < len(force_constants['membrane_planar']):
-            merged_config['membrane_planar_fc'] = force_constants['membrane_planar'][stage_index]
-        else:
-            merged_config['membrane_planar_fc'] = 0.0
-            
-        if 'membrane_dihedral' in force_constants and stage_index < len(force_constants['membrane_dihedral']):
-            merged_config['membrane_dihedral_fc'] = force_constants['membrane_dihedral'][stage_index]
-        else:
-            merged_config['membrane_dihedral_fc'] = 0.0
-        
+         
         # Set stage name for template
         merged_config['stage'] = stage
     else:
@@ -73,14 +61,10 @@ def render_template(template_file, config, stage, temperature=None, stage_dirs=N
     # Add restraints flag to the template context
     merged_config['use_restraints'] = use_restraints
     
-    # Add membrane restraint file paths if restraints are enabled
-    if use_restraints:
-        membrane_config = config.get('membrane_restraints', {})
-        if membrane_config.get('enabled', False):
-            merged_config['colvar_file'] = membrane_config.get('colvar_file')
-            merged_config['dihedral_file'] = membrane_config.get('dihedral_file')
-            merged_config['upper_leaflet_ref'] = membrane_config.get('upper_leaflet_ref')
-            merged_config['lower_leaflet_ref'] = membrane_config.get('lower_leaflet_ref')
+    # Add constraints if they are enabled
+    constraints_config = config.get('constraints', {})
+    if constraints_config.get('enabled', False):
+        merged_config['constraints'] = constraints_config
     
     # Update file paths for cross-directory references
     if stage_dirs:
@@ -91,7 +75,7 @@ def render_template(template_file, config, stage, temperature=None, stage_dirs=N
         elif stage == 'production':
             # For multi-stage equilibration, use last equilibration stage
             if 'equilibration_stages' in config:
-                num_stages = config['equilibration_stages'].get('num_stages', 6)
+                num_stages = config['equilibration_stages'].get('num_stages', 1)
                 last_eq_stage = f'eq{num_stages}'
                 if last_eq_stage in stage_dirs:
                     rel_path = os.path.relpath(stage_dirs[last_eq_stage], stage_dirs['production'])
@@ -166,10 +150,6 @@ def main():
                         help='Include restraints in minimization and equilibration stages')
     parser.add_argument('--eq-stages', type=int,
                         help='Number of equilibration stages (overrides config file)')
-    parser.add_argument('--membrane-planar-fc', nargs='+', type=float,
-                        help='Custom force constants for membrane planar restraints')
-    parser.add_argument('--membrane-dihedral-fc', nargs='+', type=float,
-                        help='Custom force constants for membrane dihedral restraints')
     
     args = parser.parse_args()
     
@@ -188,21 +168,6 @@ def main():
         if 'equilibration_stages' not in config:
             config['equilibration_stages'] = {'base_config': {}, 'force_constants': {}}
         config['equilibration_stages']['num_stages'] = args.eq_stages
-    
-    # Override force constants if specified
-    if args.membrane_planar_fc:
-        if 'equilibration_stages' not in config:
-            config['equilibration_stages'] = {'force_constants': {}}
-        if 'force_constants' not in config['equilibration_stages']:
-            config['equilibration_stages']['force_constants'] = {}
-        config['equilibration_stages']['force_constants']['membrane_planar'] = args.membrane_planar_fc
-    
-    if args.membrane_dihedral_fc:
-        if 'equilibration_stages' not in config:
-            config['equilibration_stages'] = {'force_constants': {}}
-        if 'force_constants' not in config['equilibration_stages']:
-            config['equilibration_stages']['force_constants'] = {}
-        config['equilibration_stages']['force_constants']['membrane_dihedral'] = args.membrane_dihedral_fc
     
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -230,14 +195,13 @@ def main():
             current_output_dir = output_dir / f"T{int(temp)}"
             current_output_dir.mkdir(exist_ok=True)
         
-        
         # Create stage directories
         stage_dirs = {}
         
         # Handle multi-stage equilibration
         if 'multi-equilibration' in stages_to_generate:
             eq_config = config.get('equilibration_stages', {})
-            num_eq_stages = eq_config.get('num_stages', 6)
+            num_eq_stages = eq_config.get('num_stages', 1)
             
             # Create directories for all stages
             for stage in ['minimization', 'production']:
