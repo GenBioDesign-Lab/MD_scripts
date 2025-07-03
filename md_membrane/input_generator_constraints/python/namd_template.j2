@@ -14,7 +14,7 @@ coordinates        {{ coordinates_file }}
 {% if stage != 'minimization' %}
 extendedSystem     {{ extended_system_file }}
 {% endif %}
-{% if stage == 'production' %}
+{% if stage == 'production' or (stage.startswith('eq') and stage != 'eq1') %}
 velocities         {{ velocities_file }}
 {% endif %}
 
@@ -43,7 +43,7 @@ temperature        $temperature
 
 # Force-Field Parameters
 exclude            scaled1-4
-oneFourScaling     0.833333
+oneFourScaling     1.0
 {% if stage == 'production' %}
 nonbondedScaling   {{ nonbonded_scaling }}
 {% endif %}
@@ -72,10 +72,12 @@ reassignTemp    $temperature
 {% endif %}
 
 # Periodic Boundary Conditions
+{% if stage == 'minimization' or stage == 'eq1' %}
 cellBasisVector1   {{ cell_basis_vector1 }}
 cellBasisVector2   {{ cell_basis_vector2 }}
 cellBasisVector3   {{ cell_basis_vector3 }}
 cellOrigin         {{ cell_origin }}
+{% endif %}
 
 # PME (for full-system periodic electrostatics)
 PME                yes
@@ -91,7 +93,12 @@ langevinDamping    {{ langevin_damping_production if langevin_damping_production
 langevinDamping    {{ langevin_damping if langevin_damping is defined else 10 }}
 {% endif %}
 langevinTemp       $temperature
+{% if langevin_file is defined %}
+langevinFile       {{ langevin_file }}
+langevinCol        {{ langevin_col|default('B') }}                  ;# O = occupancy, B = beta, etc.
+{% else %}
 langevinHydrogen   off
+{% endif %}
 
 # Constant Pressure Control (variable volume)
 useGroupPressure   yes

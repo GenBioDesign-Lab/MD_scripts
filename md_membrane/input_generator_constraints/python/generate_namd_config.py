@@ -51,6 +51,12 @@ def render_template(template_file, config, stage, temperature=None, stage_dirs=N
          
         # Set stage name for template
         merged_config['stage'] = stage
+        
+        # Map Langevin parameters from common config
+        if 'langevin_file' in config['common']:
+            merged_config['langevin_file'] = config['common']['langevin_file']
+        if 'langevin_col' in config['common']:
+            merged_config['langevin_col'] = config['common']['langevin_col']
     else:
         # For standard stages (minimization, equilibration, production)
         merged_config = {**config['common'], **config[stage]}

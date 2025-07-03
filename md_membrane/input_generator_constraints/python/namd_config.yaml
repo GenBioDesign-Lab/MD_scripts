@@ -1,9 +1,9 @@
 # Common settings
 common:
-  structure_file: "/data01/genbiolab/mdanh/data/MD_scripts/test/DPPC_CNT/ionized/cnt_mem_ionized/cnt_mem_ionized.psf"
+  structure_file: "/data01/genbiolab/mdanh/data/MD_scripts/test/new_ff/cnt_mem/ionized/cnt_mem_ionized/cnt_mem_ionized.psf"
   parameters_file: "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36m_prot.prm"
   parameters_files:
-     - "/data01/genbiolab/mdanh/data/CHARMMFF/cnt_ff/cnt_6_40_oh_CHARMM.prm"
+     - "/data01/genbiolab/mdanh/data/CHARMMFF/cnt_ff/final/cnt_oh.prm"
      - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36m_prot.prm"
      - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36_carb.prm"
      - "/data01/genbiolab/mdanh/data/CHARMMFF/toppar/par_all36_lipid.prm"
@@ -28,12 +28,14 @@ common:
   pme_grid_size_z: 100
   langevin_damping_equilibration: 10
   langevin_damping_production: 1
+  langevin_file: "langvin_water.pdb"
+  langevin_col: "B"
   langevin_piston_target: 1.01325
   langevin_piston_period: 100.0
   langevin_piston_decay: 50.0
   first_timestep: 0
   use_flexible_cell: true
-  use_constant_ratio: false
+  use_constant_ratio: true
   use_constant_area: false
 
 # Minimization stage config
@@ -51,7 +53,7 @@ minimization:
 
 # Multi-stage equilibration configuration
 equilibration_stages:
-  num_stages: 1
+  num_stages: 6
   base_config:
     job_description: "Membrane equilibration with constraints"
     steps_per_cycle: 20
@@ -69,22 +71,10 @@ equilibration_stages:
   stage_specific:
     eq1:
       num_steps: 100000
+      langevin_damping: 10.0
       timestep: 0.5 
-    eq2:
-      num_steps: 200000
-      timestep: 0.5 
-    eq3:
-      num_steps: 300000
-      timestep: 0.5 
-    eq4:
-      num_steps: 500000
-      timestep: 1.0 
-    eq5:
-      num_steps: 500000
-      timestep: 1.0
-    eq6:
-      num_steps: 20000000
-      timestep: 1.0
+      temperature: 300 
+
 # Single equilibration stage config
 equilibration:
   stage: equilibration
@@ -121,7 +111,7 @@ production:
 # Constraints configuration
 constraints:
   enabled: true
-  cons_pdb: "CNT_constraints.pdb"
+  cons_pdb: "/data01/genbiolab/mdanh/data/MD_scripts/test/new_ff/cnt_mem/ionized/cnt_mem_ionized/cnt_constraints.pdb"
   cons_col: "B"
   cons_exp: 2
 
