@@ -57,6 +57,8 @@ def render_template(template_file, config, stage, temperature=None, stage_dirs=N
             merged_config['langevin_file'] = config['common']['langevin_file']
         if 'langevin_col' in config['common']:
             merged_config['langevin_col'] = config['common']['langevin_col']
+        if 'langevin_damping' in config['common']:
+            merged_config['langevin_damping'] = config['common']['langevin_damping']
     else:
         # For standard stages (minimization, equilibration, production)
         merged_config = {**config['common'], **config[stage]}

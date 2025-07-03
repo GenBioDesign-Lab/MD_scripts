@@ -26,8 +26,7 @@ common:
   pme_grid_size_x: 45
   pme_grid_size_y: 45
   pme_grid_size_z: 100
-  langevin_damping_equilibration: 10
-  langevin_damping_production: 1
+  langevin_damping: 1
   langevin_file: "langvin_water.pdb"
   langevin_col: "B"
   langevin_piston_target: 1.01325
