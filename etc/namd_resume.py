@@ -71,7 +71,7 @@ def determine_output_paths(config):
     for file_type, filename in output_files.items():
         filepath = os.path.join(config_dir, filename)
         if os.path.exists(filepath):
-            existing_files[file_type] = filename
+            existing_files[file_type] = filepath  # Store full path instead of just filename
     
     # Determine best files to use
     coordinates_file = existing_files.get('restart_coor', existing_files.get('coor'))
@@ -93,7 +93,7 @@ def get_final_timestep(config, output_files):
     """Determine the final timestep from the previous simulation."""
     
     # Try to read from .xsc file to get the timestep
-    xsc_file = os.path.join(config['config_dir'], output_files['extendedSystem'])
+    xsc_file = output_files['extendedSystem']  # Already full path
     
     try:
         with open(xsc_file, 'r') as f:
@@ -197,7 +197,7 @@ def main():
     
     args = parser.parse_args()
     
-    config_file = args.input
+    config_file = os.path.abspath(args.input)  # Use absolute path for input file
     new_numsteps = args.numsteps
     
     if not os.path.exists(config_file):
