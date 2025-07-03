@@ -1,6 +1,6 @@
 #load file
-mol new complex.psf
-mol addfile complex.pdb
+mol new cnt_mem_ionized.psf
+mol addfile cnt_mem_ionized.pdb
 
 #set all atom beta =0
 
