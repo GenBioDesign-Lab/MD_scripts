@@ -14,7 +14,7 @@ coordinates        {{ coordinates_file }}
 {% if stage != 'minimization' %}
 extendedSystem     {{ extended_system_file }}
 {% endif %}
-{% if stage == 'production' or (stage.startswith('eq') and stage != 'eq1') %}
+{% if stage == 'production' or (stage.startswith('eq') and stage != 'eq1' and stage != 'equilibration') %}
 velocities         {{ velocities_file }}
 {% endif %}
 
@@ -72,7 +72,7 @@ reassignTemp    $temperature
 {% endif %}
 
 # Periodic Boundary Conditions
-{% if stage == 'minimization' or stage == 'eq1' %}
+{% if stage == 'minimization' or stage == 'eq1' or stage == 'equilibration' %}
 cellBasisVector1   {{ cell_basis_vector1 }}
 cellBasisVector2   {{ cell_basis_vector2 }}
 cellBasisVector3   {{ cell_basis_vector3 }}
