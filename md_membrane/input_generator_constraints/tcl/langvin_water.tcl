@@ -6,7 +6,7 @@ $all set beta 0.0
 
 set wat [atomselect top "water"]
 
-$cnt set beta 1.0
+$wat set beta 1.0
 
 $all writepdb langvin_water.pdb
 
