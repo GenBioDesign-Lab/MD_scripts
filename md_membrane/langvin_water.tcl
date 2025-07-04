@@ -8,6 +8,6 @@ set wat [atomselect top "water"]
 
 $wat set beta 1.0
 
-$all writepdb langvin_water.pdb
+$all writepdb langevin_water.pdb
 
 quit

@@ -14,20 +14,20 @@ common:
   temperature: 300
   cutoff: 12.0
   switch_dist: 10.0
-  pairlist_dist: 14.0
+  pairlist_dist: 16.0
   timestep: 2.0
   nonbonded_freq: 1
   full_elect_frequency: 2
-  cell_basis_vector1: "81.54    0.0    0.0"
-  cell_basis_vector2: "0.0   83.31   0.0"
-  cell_basis_vector3: "0.0    0.0   80.0"
-  cell_origin: "0.766   1.751  -0.858"
+  cell_basis_vector1: "67.0    0.0    0.0"
+  cell_basis_vector2: "0.0   67.0   0.0"
+  cell_basis_vector3: "0.0    0.0   84.0"
+  cell_origin: "0.0   0.0  0.0"
   pme_grid_spacing: 1.0
   pme_grid_size_x: 45
   pme_grid_size_y: 45
   pme_grid_size_z: 100
   langevin_damping: 1
-  langevin_file: "langvin_water.pdb"
+  langevin_file: "/data01/genbiolab/mdanh/data/MD_scripts/test/new_ff/cnt_mem/ionized/cnt_mem_ionized/langevin_water.pdb"
   langevin_col: "B"
   langevin_piston_target: 1.01325
   langevin_piston_period: 100.0
@@ -41,39 +41,45 @@ common:
 minimization:
   stage: minimization
   job_description: "Minimization of CNT-membrane system"
-  coordinates_file: "/data01/genbiolab/mdanh/data/MD_scripts/test/DPPC_CNT/ionized/cnt_mem_ionized/cnt_mem_ionized.pdb"
+  coordinates_file: "/data01/genbiolab/mdanh/data/MD_scripts/test/new_ff/cnt_mem/ionized/cnt_mem_ionized/cnt_mem_ionized.pdb"
   output_name: "final_min"
   steps_per_cycle: 10
-  restart_freq: 500
-  dcd_freq: 200
-  output_energies: 100
-  output_pressure: 100
+  restart_freq: 1000
+  dcd_freq: 1000
+  output_energies: 1000
+  output_pressure: 1000
   num_minimize_steps: 30000
 
 # Multi-stage equilibration configuration
 equilibration_stages:
-  num_stages: 6
+  num_stages: 4
   base_config:
     job_description: "Membrane equilibration with constraints"
     steps_per_cycle: 20
-    restart_freq: 100000
+    restart_freq: 5000
     dcd_freq: 5000
     output_energies: 5000
     output_pressure: 5000
     num_steps: 50000
     timestep: 0.5
-    langevin_damping: 10.0
+    langevin_damping: 1.0
     reassign_freq: 500
     reassign_temp: 300
   
   # Specific settings for each stage
   stage_specific:
     eq1:
-      num_steps: 100000
-      langevin_damping: 10.0
+      num_steps: 200000
       timestep: 0.5 
-      temperature: 300 
-
+    eq2:
+      num_steps: 500000
+      timestep: 0.5 
+    eq3:
+      num_steps: 1000000
+      timestep: 1.0 
+    eq4:
+      num_steps: 10000000
+      timestep: 2.0 
 # Single equilibration stage config
 equilibration:
   stage: equilibration
@@ -82,11 +88,11 @@ equilibration:
   extended_system_file: "final_min.xsc"
   output_name: "final_eq"
   steps_per_cycle: 20
-  restart_freq: 500
-  dcd_freq: 500
-  output_energies: 500
-  output_pressure: 500
-  num_steps: 500000
+  restart_freq: 1000
+  dcd_freq: 1000
+  output_energies: 1000
+  output_pressure: 1000
+  num_steps: 50000
   reassign_freq: 500
   reassign_temp: 300
 
@@ -98,7 +104,7 @@ production:
   extended_system_file: "final_eq1.xsc"
   velocities_file: "final_eq1.vel"
   output_name: "final_NPT"
-  nonbonded_scaling: 0.833
+  nonbonded_scaling: 1.0
   steps_per_cycle: 20
   restart_freq: 5000
   dcd_freq: 5000
