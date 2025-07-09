@@ -14,6 +14,11 @@ pdb_file = os.path.splitext(input_file)[0] + '.pdb'
 
 mol = Chem.MolFromMol2File(input_file, sanitize=False, removeHs=False)
 
+# Check if molecule has more than 1000 atoms for renaming logic
+has_many_atoms = mol.GetNumAtoms() > 1000
+if has_many_atoms:
+    print(f"Molecule has {mol.GetNumAtoms()} atoms. Applying renaming: atoms ≥1000 will be renamed using different letters (D1, E1, F1, etc.)")
+
 # Assign custom partial charges based on bonding patterns
 def assign_custom_charges(mol):
     """
@@ -122,8 +127,11 @@ def write_charmm_rtf(topology, filename="topology.rtf"):
     """Write topology in CHARMM RTF format"""
     with open(filename, 'w') as f:
         f.write("* Topology file generated from RDKit\n")
+        f.write("MASS     1 CCNT     12.011000\n")
+        f.write("MASS     2 OCNT     16.000000\n")
+        f.write("MASS     3 HOCNT      1.008000\n")
+        f.write("MASS     4 HCCNT      1.008000\n")
         f.write("*\n\n")
-        
         # Calculate total charge from custom charges
         total_charge = 0.0
         for i in range(mol.GetNumAtoms()):
@@ -132,7 +140,7 @@ def write_charmm_rtf(topology, filename="topology.rtf"):
                 charge = float(atom.GetProp('_CustomCharge'))
                 total_charge += charge
         
-        f.write(f"RESI CNT    {total_charge:8.3f}  ! Carbon nanotube residue\n")
+        f.write(f"RESI CNT    {total_charge:8.3f}\n")
         f.write("GROUP\n")
         
         # Atoms section
@@ -146,8 +154,18 @@ def write_charmm_rtf(topology, filename="topology.rtf"):
                 atom_counts[element] = 0
             atom_counts[element] += 1
             
-            atom_name = f"{element}{atom_counts[element]}"
+            # Apply renaming logic if molecule has >1000 atoms
+            count = atom_counts[element]
+            if has_many_atoms and count >= 1000:
+                # Use different letters: C1000->D1, C2000->E1, H1000->I1, O1000->P1, etc.
+                letter_offset = (count - 1) // 999  # 0 for 1-999, 1 for 1000-1999, etc.
+                new_count = ((count - 1) % 999) + 1  # 1-999 cycle
+                new_element = chr(ord(element) + letter_offset + 1)  # C->D, H->I, O->P
+                atom_name = f"{new_element}{new_count}"
+            else:
+                atom_name = f"{element}{count}"
             
+            # Determine CHARMM type based on actual element (not renamed atom name)
             if element == 'C':
                 charmm_type = "CCNT"
             elif element == 'O':
@@ -179,7 +197,16 @@ def write_charmm_rtf(topology, filename="topology.rtf"):
             for i in range(atom_idx):
                 if mol.GetAtomWithIdx(i).GetSymbol() == element:
                     count += 1
-            return f"{element}{count}"
+            
+            # Apply renaming logic if molecule has >1000 atoms
+            if has_many_atoms and count >= 1000:
+                # Use different letters: C1000->D1, C2000->E1, H1000->I1, O1000->P1, etc.
+                letter_offset = (count - 1) // 999  # 0 for 1-999, 1 for 1000-1999, etc.
+                new_count = ((count - 1) % 999) + 1  # 1-999 cycle
+                new_element = chr(ord(element) + letter_offset + 1)  # C->D, H->I, O->P
+                return f"{new_element}{new_count}"
+            else:
+                return f"{element}{count}"
         
         # Bonds section
         if topology['bonds']:
@@ -230,7 +257,16 @@ def rename_pdb_atoms(pdb_filename, mol):
         for i in range(atom_idx):
             if mol.GetAtomWithIdx(i).GetSymbol() == element:
                 count += 1
-        return f"{element}{count}"
+        
+        # Apply renaming logic if molecule has >1000 atoms
+        if has_many_atoms and count >= 1000:
+            # Use different letters: C1000->D1, C2000->E1, H1000->I1, O1000->P1, etc.
+            letter_offset = (count - 1) // 999  # 0 for 1-999, 1 for 1000-1999, etc.
+            new_count = ((count - 1) % 999) + 1  # 1-999 cycle
+            new_element = chr(ord(element) + letter_offset + 1)  # C->D, H->I, O->P
+            return f"{new_element}{new_count}"
+        else:
+            return f"{element}{count}"
     
     try:
         with open(pdb_filename, 'r') as f:
