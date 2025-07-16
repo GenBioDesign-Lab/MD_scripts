@@ -3,17 +3,17 @@
 #SBATCH --output=output.log
 #SBATCH --error=error.log
 #SBATCH --partition=gpus
-#SBATCH --gres=gpu:rtx5000:1
-#SBATCH --nodelist=gpu04
+#SBATCH --gres=gpu:a6000:1
+#SBATCH --nodelist=gpu03
 #SBATCH --array=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 
 ml load namd/3.0.1-GPU
-cd /data01/genbiolab/mdanh/data/MD_scripts/test/truncated_mem/namd #where the namd config files are
+cd /data01/genbiolab/mdanh/data/MD_scripts/working/test/cnt6_50/namd #where the namd config files are
 
 # Run minimization
-#namd3 +p24 +idlepoll +setcpuaffinity +devices 0 minimization/01_Minimization.namd > minimization/01_Minimization.log
+namd3 +p24 +idlepoll +setcpuaffinity +devices 0 minimization/01_Minimization.namd > minimization/01_Minimization.log
 
 # Array of equilibration folders
 eq_folders=("eq1" "eq2" "eq3" "eq4" "eq5" "eq6")
@@ -38,7 +38,7 @@ for i in "${!eq_folders[@]}"; do
     fi
         
     # Run NAMD simulation
-    #namd3 +p24 +idlepoll +setcpuaffinity +devices 0 "$namd_config" > "${namd_config%.namd}.log" 2>&1
+    namd3 +p24 +idlepoll +setcpuaffinity +devices 0 "$namd_config" > "${namd_config%.namd}.log" 2>&1
 done
 
 # Return to base directory
