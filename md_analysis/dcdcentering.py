@@ -56,6 +56,7 @@ print(f"  Trajectory: {args.traj}")
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     u = mda.Universe(args.structure, args.traj)
+    u.transfer_to_memory(step=args.stride)
 
 # Define atom selections
 protein = u.select_atoms(args.sel)
@@ -86,17 +87,17 @@ u.trajectory.add_transformations(*transformations)
 
 # OUTPUT WRITING
 total_frames = len(u.trajectory)
-frames_to_write = len(range(0, total_frames, args.stride))
+frames_to_write = total_frames  # Already strided in memory
 
 print(f"\nWriting trajectory to: {args.o}")
-print(f"  Total frames: {total_frames}")
+print(f"  Total frames in memory: {total_frames}")
 print(f"  Stride: {args.stride}")
 print(f"  Frames to write: {frames_to_write}")
 
-# Write XTC with frame stride optimization
+# Write XTC (trajectory already strided in memory)
 with mda.Writer(args.o, all_atoms.n_atoms) as writer:
     frame_count = 0
-    for i, ts in enumerate(u.trajectory[::args.stride]):
+    for i, ts in enumerate(u.trajectory):
         writer.write(all_atoms)
         frame_count += 1
         

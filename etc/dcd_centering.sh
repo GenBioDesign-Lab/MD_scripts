@@ -11,7 +11,7 @@
 ml load anaconda3/2024.10
 conda activate mdpipe
 
-python /data01/genbiolab/mdanh/data/MD_scripts/working/test/dcdcentering_update.py \
+python /data01/genbiolab/mdanh/data/MD_scripts/md_analysis/dcdcentering.py \
        -structure /data01/genbiolab/mdanh/data/MD_scripts/working/test/cnt_mem_ionized.psf \
        -traj /data01/genbiolab/mdanh/data/MD_scripts/working/test/final_NPT.dcd \
        -sel "segid CNT1 or segid CNT2 or segid CNT3" \
