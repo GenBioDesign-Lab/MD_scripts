@@ -157,18 +157,72 @@ def write_charmm_rtf(topology, filename="topology.rtf"):
             # Apply renaming logic if molecule has >1000 atoms
             count = atom_counts[element]
             if has_many_atoms and count > 999:
-                # Use alphabet combinations: C1000->CAA0, C1001->CAA1, etc.
+                # Use mixed character/number combinations: C#**, C*##, C#*#, etc.
                 excess = count - 999
-                # Generate all possible 2-letter + 1-digit combinations (AA0-EE9 = 250 combinations)
-                letters = 'ABCDE'
-                digits = '0123456789'
-                combo_index = (excess - 1) % 250  # Cycle through 250 combinations
+                letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # 26 letters
+                digits = '0123456789'  # 10 digits
                 
-                first_letter_idx = combo_index // 50  # 0-4 for A-E
-                second_letter_idx = (combo_index % 50) // 10  # 0-4 for A-E
-                digit_idx = combo_index % 10  # 0-9
+                # Define patterns: # = character, * = number
+                patterns = ['#**', '*##', '#*#', '##*', '**#', '*#*']
+                pattern_sizes = [26*10*10, 10*26*26, 26*10*26, 26*26*10, 10*10*26, 10*26*10]  # 2600, 6760, 6760, 6760, 2600, 2600
                 
-                atom_name = f"{element}{letters[first_letter_idx]}{letters[second_letter_idx]}{digits[digit_idx]}"
+                # Find which pattern and position within pattern
+                total_used = 0
+                pattern_idx = 0
+                for i, size in enumerate(pattern_sizes):
+                    if excess <= total_used + size:
+                        pattern_idx = i
+                        pos_in_pattern = excess - total_used - 1
+                        break
+                    total_used += size
+                else:
+                    # If we exceed all patterns, cycle back
+                    total_combinations = sum(pattern_sizes)
+                    excess = ((excess - 1) % total_combinations) + 1
+                    total_used = 0
+                    for i, size in enumerate(pattern_sizes):
+                        if excess <= total_used + size:
+                            pattern_idx = i
+                            pos_in_pattern = excess - total_used - 1
+                            break
+                        total_used += size
+                
+                pattern = patterns[pattern_idx]
+                
+                # Generate the 3-character suffix based on pattern
+                suffix = ""
+                if pattern == '#**':  # char + num + num
+                    char_idx = pos_in_pattern // 100
+                    num1_idx = (pos_in_pattern % 100) // 10
+                    num2_idx = pos_in_pattern % 10
+                    suffix = f"{letters[char_idx]}{digits[num1_idx]}{digits[num2_idx]}"
+                elif pattern == '*##':  # num + char + char
+                    num_idx = pos_in_pattern // 676  # 26*26
+                    char1_idx = (pos_in_pattern % 676) // 26
+                    char2_idx = pos_in_pattern % 26
+                    suffix = f"{digits[num_idx]}{letters[char1_idx]}{letters[char2_idx]}"
+                elif pattern == '#*#':  # char + num + char
+                    char1_idx = pos_in_pattern // 260  # 10*26
+                    num_idx = (pos_in_pattern % 260) // 26
+                    char2_idx = pos_in_pattern % 26
+                    suffix = f"{letters[char1_idx]}{digits[num_idx]}{letters[char2_idx]}"
+                elif pattern == '##*':  # char + char + num
+                    char1_idx = pos_in_pattern // 260  # 26*10
+                    char2_idx = (pos_in_pattern % 260) // 10
+                    num_idx = pos_in_pattern % 10
+                    suffix = f"{letters[char1_idx]}{letters[char2_idx]}{digits[num_idx]}"
+                elif pattern == '**#':  # num + num + char
+                    num1_idx = pos_in_pattern // 260  # 10*26
+                    num2_idx = (pos_in_pattern % 260) // 26
+                    char_idx = pos_in_pattern % 26
+                    suffix = f"{digits[num1_idx]}{digits[num2_idx]}{letters[char_idx]}"
+                elif pattern == '*#*':  # num + char + num
+                    num1_idx = pos_in_pattern // 260  # 26*10
+                    char_idx = (pos_in_pattern % 260) // 10
+                    num2_idx = pos_in_pattern % 10
+                    suffix = f"{digits[num1_idx]}{letters[char_idx]}{digits[num2_idx]}"
+                
+                atom_name = f"{element}{suffix}"
             else:
                 atom_name = f"{element}{count}"
 
@@ -207,18 +261,72 @@ def write_charmm_rtf(topology, filename="topology.rtf"):
             
             # Apply renaming logic if molecule has >1000 atoms
             if has_many_atoms and count > 999:
-                # Use alphabet combinations: C1000->CAA0, C1001->CAA1, etc.
+                # Use mixed character/number combinations: C#**, C*##, C#*#, etc.
                 excess = count - 999
-                # Generate all possible 2-letter + 1-digit combinations (AA0-EE9 = 250 combinations)
-                letters = 'ABCDE'
-                digits = '0123456789'
-                combo_index = (excess - 1) % 250  # Cycle through 250 combinations
+                letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # 26 letters
+                digits = '0123456789'  # 10 digits
                 
-                first_letter_idx = combo_index // 50  # 0-4 for A-E
-                second_letter_idx = (combo_index % 50) // 10  # 0-4 for A-E
-                digit_idx = combo_index % 10  # 0-9
+                # Define patterns: # = character, * = number
+                patterns = ['#**', '*##', '#*#', '##*', '**#', '*#*']
+                pattern_sizes = [26*10*10, 10*26*26, 26*10*26, 26*26*10, 10*10*26, 10*26*10]  # 2600, 6760, 6760, 6760, 2600, 2600
                 
-                return f"{element}{letters[first_letter_idx]}{letters[second_letter_idx]}{digits[digit_idx]}"
+                # Find which pattern and position within pattern
+                total_used = 0
+                pattern_idx = 0
+                for i, size in enumerate(pattern_sizes):
+                    if excess <= total_used + size:
+                        pattern_idx = i
+                        pos_in_pattern = excess - total_used - 1
+                        break
+                    total_used += size
+                else:
+                    # If we exceed all patterns, cycle back
+                    total_combinations = sum(pattern_sizes)
+                    excess = ((excess - 1) % total_combinations) + 1
+                    total_used = 0
+                    for i, size in enumerate(pattern_sizes):
+                        if excess <= total_used + size:
+                            pattern_idx = i
+                            pos_in_pattern = excess - total_used - 1
+                            break
+                        total_used += size
+                
+                pattern = patterns[pattern_idx]
+                
+                # Generate the 3-character suffix based on pattern
+                suffix = ""
+                if pattern == '#**':  # char + num + num
+                    char_idx = pos_in_pattern // 100
+                    num1_idx = (pos_in_pattern % 100) // 10
+                    num2_idx = pos_in_pattern % 10
+                    suffix = f"{letters[char_idx]}{digits[num1_idx]}{digits[num2_idx]}"
+                elif pattern == '*##':  # num + char + char
+                    num_idx = pos_in_pattern // 676  # 26*26
+                    char1_idx = (pos_in_pattern % 676) // 26
+                    char2_idx = pos_in_pattern % 26
+                    suffix = f"{digits[num_idx]}{letters[char1_idx]}{letters[char2_idx]}"
+                elif pattern == '#*#':  # char + num + char
+                    char1_idx = pos_in_pattern // 260  # 10*26
+                    num_idx = (pos_in_pattern % 260) // 26
+                    char2_idx = pos_in_pattern % 26
+                    suffix = f"{letters[char1_idx]}{digits[num_idx]}{letters[char2_idx]}"
+                elif pattern == '##*':  # char + char + num
+                    char1_idx = pos_in_pattern // 260  # 26*10
+                    char2_idx = (pos_in_pattern % 260) // 10
+                    num_idx = pos_in_pattern % 10
+                    suffix = f"{letters[char1_idx]}{letters[char2_idx]}{digits[num_idx]}"
+                elif pattern == '**#':  # num + num + char
+                    num1_idx = pos_in_pattern // 260  # 10*26
+                    num2_idx = (pos_in_pattern % 260) // 26
+                    char_idx = pos_in_pattern % 26
+                    suffix = f"{digits[num1_idx]}{digits[num2_idx]}{letters[char_idx]}"
+                elif pattern == '*#*':  # num + char + num
+                    num1_idx = pos_in_pattern // 260  # 26*10
+                    char_idx = (pos_in_pattern % 260) // 10
+                    num2_idx = pos_in_pattern % 10
+                    suffix = f"{digits[num1_idx]}{letters[char_idx]}{digits[num2_idx]}"
+                
+                return f"{element}{suffix}"
             else:
                 return f"{element}{count}"
         
@@ -274,18 +382,72 @@ def rename_pdb_atoms(pdb_filename, mol):
         
         # Apply renaming logic if molecule has >1000 atoms
         if has_many_atoms and count > 999:
-            # Use alphabet combinations: C1000->CAA0, C1001->CAA1, etc.
+            # Use mixed character/number combinations: C#**, C*##, C#*#, etc.
             excess = count - 999
-            # Generate all possible 2-letter + 1-digit combinations (AA0-EE9 = 250 combinations)
-            letters = 'ABCDE'
-            digits = '0123456789'
-            combo_index = (excess - 1) % 250  # Cycle through 250 combinations
+            letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'  # 26 letters
+            digits = '0123456789'  # 10 digits
             
-            first_letter_idx = combo_index // 50  # 0-4 for A-E
-            second_letter_idx = (combo_index % 50) // 10  # 0-4 for A-E
-            digit_idx = combo_index % 10  # 0-9
+            # Define patterns: # = character, * = number
+            patterns = ['#**', '*##', '#*#', '##*', '**#', '*#*']
+            pattern_sizes = [26*10*10, 10*26*26, 26*10*26, 26*26*10, 10*10*26, 10*26*10]  # 2600, 6760, 6760, 6760, 2600, 2600
             
-            return f"{element}{letters[first_letter_idx]}{letters[second_letter_idx]}{digits[digit_idx]}"
+            # Find which pattern and position within pattern
+            total_used = 0
+            pattern_idx = 0
+            for i, size in enumerate(pattern_sizes):
+                if excess <= total_used + size:
+                    pattern_idx = i
+                    pos_in_pattern = excess - total_used - 1
+                    break
+                total_used += size
+            else:
+                # If we exceed all patterns, cycle back
+                total_combinations = sum(pattern_sizes)
+                excess = ((excess - 1) % total_combinations) + 1
+                total_used = 0
+                for i, size in enumerate(pattern_sizes):
+                    if excess <= total_used + size:
+                        pattern_idx = i
+                        pos_in_pattern = excess - total_used - 1
+                        break
+                    total_used += size
+            
+            pattern = patterns[pattern_idx]
+            
+            # Generate the 3-character suffix based on pattern
+            suffix = ""
+            if pattern == '#**':  # char + num + num
+                char_idx = pos_in_pattern // 100
+                num1_idx = (pos_in_pattern % 100) // 10
+                num2_idx = pos_in_pattern % 10
+                suffix = f"{letters[char_idx]}{digits[num1_idx]}{digits[num2_idx]}"
+            elif pattern == '*##':  # num + char + char
+                num_idx = pos_in_pattern // 676  # 26*26
+                char1_idx = (pos_in_pattern % 676) // 26
+                char2_idx = pos_in_pattern % 26
+                suffix = f"{digits[num_idx]}{letters[char1_idx]}{letters[char2_idx]}"
+            elif pattern == '#*#':  # char + num + char
+                char1_idx = pos_in_pattern // 260  # 10*26
+                num_idx = (pos_in_pattern % 260) // 26
+                char2_idx = pos_in_pattern % 26
+                suffix = f"{letters[char1_idx]}{digits[num_idx]}{letters[char2_idx]}"
+            elif pattern == '##*':  # char + char + num
+                char1_idx = pos_in_pattern // 260  # 26*10
+                char2_idx = (pos_in_pattern % 260) // 10
+                num_idx = pos_in_pattern % 10
+                suffix = f"{letters[char1_idx]}{letters[char2_idx]}{digits[num_idx]}"
+            elif pattern == '**#':  # num + num + char
+                num1_idx = pos_in_pattern // 260  # 10*26
+                num2_idx = (pos_in_pattern % 260) // 26
+                char_idx = pos_in_pattern % 26
+                suffix = f"{digits[num1_idx]}{digits[num2_idx]}{letters[char_idx]}"
+            elif pattern == '*#*':  # num + char + num
+                num1_idx = pos_in_pattern // 260  # 26*10
+                char_idx = (pos_in_pattern % 260) // 10
+                num2_idx = pos_in_pattern % 10
+                suffix = f"{digits[num1_idx]}{letters[char_idx]}{digits[num2_idx]}"
+            
+            return f"{element}{suffix}"
         else:
             return f"{element}{count}"
     
