@@ -17,7 +17,7 @@ mol = Chem.MolFromMol2File(input_file, sanitize=False, removeHs=False)
 # Check if molecule has more than 1000 atoms for renaming logic
 has_many_atoms = mol.GetNumAtoms() > 1000
 if has_many_atoms:
-    print(f"Molecule has {mol.GetNumAtoms()} atoms. Applying renaming: atoms ≥1000 will be renamed using different letters (D1, E1, F1, etc.)")
+    print(f"Molecule has {mol.GetNumAtoms()} atoms. Applying atom renaming")
 
 # Assign custom partial charges based on bonding patterns
 def assign_custom_charges(mol):
@@ -156,15 +156,22 @@ def write_charmm_rtf(topology, filename="topology.rtf"):
             
             # Apply renaming logic if molecule has >1000 atoms
             count = atom_counts[element]
-            if has_many_atoms and count >= 1000:
-                # Use different letters: C1000->D1, C2000->E1, H1000->I1, O1000->P1, etc.
-                letter_offset = (count - 1) // 999  # 0 for 1-999, 1 for 1000-1999, etc.
-                new_count = ((count - 1) % 999) + 1  # 1-999 cycle
-                new_element = chr(ord(element) + letter_offset + 1)  # C->D, H->I, O->P
-                atom_name = f"{new_element}{new_count}"
+            if has_many_atoms and count > 999:
+                # Use alphabet combinations: C1000->CAA0, C1001->CAA1, etc.
+                excess = count - 999
+                # Generate all possible 2-letter + 1-digit combinations (AA0-EE9 = 250 combinations)
+                letters = 'ABCDE'
+                digits = '0123456789'
+                combo_index = (excess - 1) % 250  # Cycle through 250 combinations
+                
+                first_letter_idx = combo_index // 50  # 0-4 for A-E
+                second_letter_idx = (combo_index % 50) // 10  # 0-4 for A-E
+                digit_idx = combo_index % 10  # 0-9
+                
+                atom_name = f"{element}{letters[first_letter_idx]}{letters[second_letter_idx]}{digits[digit_idx]}"
             else:
                 atom_name = f"{element}{count}"
-            
+
             # Determine CHARMM type based on actual element (not renamed atom name)
             if element == 'C':
                 charmm_type = "CCNT"
@@ -199,12 +206,19 @@ def write_charmm_rtf(topology, filename="topology.rtf"):
                     count += 1
             
             # Apply renaming logic if molecule has >1000 atoms
-            if has_many_atoms and count >= 1000:
-                # Use different letters: C1000->D1, C2000->E1, H1000->I1, O1000->P1, etc.
-                letter_offset = (count - 1) // 999  # 0 for 1-999, 1 for 1000-1999, etc.
-                new_count = ((count - 1) % 999) + 1  # 1-999 cycle
-                new_element = chr(ord(element) + letter_offset + 1)  # C->D, H->I, O->P
-                return f"{new_element}{new_count}"
+            if has_many_atoms and count > 999:
+                # Use alphabet combinations: C1000->CAA0, C1001->CAA1, etc.
+                excess = count - 999
+                # Generate all possible 2-letter + 1-digit combinations (AA0-EE9 = 250 combinations)
+                letters = 'ABCDE'
+                digits = '0123456789'
+                combo_index = (excess - 1) % 250  # Cycle through 250 combinations
+                
+                first_letter_idx = combo_index // 50  # 0-4 for A-E
+                second_letter_idx = (combo_index % 50) // 10  # 0-4 for A-E
+                digit_idx = combo_index % 10  # 0-9
+                
+                return f"{element}{letters[first_letter_idx]}{letters[second_letter_idx]}{digits[digit_idx]}"
             else:
                 return f"{element}{count}"
         
@@ -259,12 +273,19 @@ def rename_pdb_atoms(pdb_filename, mol):
                 count += 1
         
         # Apply renaming logic if molecule has >1000 atoms
-        if has_many_atoms and count >= 1000:
-            # Use different letters: C1000->D1, C2000->E1, H1000->I1, O1000->P1, etc.
-            letter_offset = (count - 1) // 999  # 0 for 1-999, 1 for 1000-1999, etc.
-            new_count = ((count - 1) % 999) + 1  # 1-999 cycle
-            new_element = chr(ord(element) + letter_offset + 1)  # C->D, H->I, O->P
-            return f"{new_element}{new_count}"
+        if has_many_atoms and count > 999:
+            # Use alphabet combinations: C1000->CAA0, C1001->CAA1, etc.
+            excess = count - 999
+            # Generate all possible 2-letter + 1-digit combinations (AA0-EE9 = 250 combinations)
+            letters = 'ABCDE'
+            digits = '0123456789'
+            combo_index = (excess - 1) % 250  # Cycle through 250 combinations
+            
+            first_letter_idx = combo_index // 50  # 0-4 for A-E
+            second_letter_idx = (combo_index % 50) // 10  # 0-4 for A-E
+            digit_idx = combo_index % 10  # 0-9
+            
+            return f"{element}{letters[first_letter_idx]}{letters[second_letter_idx]}{digits[digit_idx]}"
         else:
             return f"{element}{count}"
     
