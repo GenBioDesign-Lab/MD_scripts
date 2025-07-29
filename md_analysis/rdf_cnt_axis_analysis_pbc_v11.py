@@ -56,7 +56,7 @@ def compute_rdf(universe, cnt_sel="resname CNT*", lip_sel="resname *PC *PE and n
         Lx, Ly, Lz = ts.dimensions[:3]
         box_half = min(Lx, Ly) / 2
         
-        # Smart PBC: only replicate when needed
+        # PBC only replicate when needed
         if r_max > box_half:
             # Calculate required replication
             nx = min(ceil((r_max - box_half) / Lx), 3)
@@ -147,7 +147,7 @@ def plot_results(r, g_r, raw_hist, output_prefix="rdf_results"):
 def main():
     """Main analysis function."""
     parser = argparse.ArgumentParser(
-        description="Calculate CNT-lipid RDF with smart PBC handling",
+        description="Calculate CNT-lipid RDF with PBC",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("topology", help="Topology file (PSF/GRO/PDB)")
