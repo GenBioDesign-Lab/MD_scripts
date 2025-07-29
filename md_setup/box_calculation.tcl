@@ -1,11 +1,8 @@
-#Usage: vmd -e box_calculation.tcl -args <.psf file> <.pdb file>
-# Get command-line arguments
-set psf_file [lindex $argv 0]
-set pdb_file [lindex $argv 1]
+#Usage: vmd -e box_calculation.tcl 
 
 # Load system
-mol new $psf_file
-mol addfile $pdb_file
+mol new DPPC_140.pdb
+#mol addfile <pdb file>
 
 # Bounding box
 set all   [atomselect top all]
