@@ -3,17 +3,14 @@
 # Required modules: analyze_atoms.tcl, calculate_padding.tcl
 
 #Input file
-set xsc_file "/data01/genbiolab/mdanh/data/MD_scripts/working/step6.6_equilibration.xsc"
-mol new /data01/genbiolab/mdanh/data/MD_scripts/working/cnt_mem.psf
-mol addfile /data01/genbiolab/mdanh/data/MD_scripts/working/cnt_mem.pdb
+set xsc_file "{xsc_file}"
+mol new {system_psf}
+mol addfile {system_pdb}
 
 # Create output directories
-set tmp_dir "output/tmp"
-set final_dir "output/final"
+set tmp_dir "tmp"
+set final_dir "final"
 
-if {![file exists "output"]} {
-    file mkdir "output"
-}
 if {![file exists $tmp_dir]} {
     file mkdir $tmp_dir
 }
@@ -94,7 +91,7 @@ $all writepsf $tmp_dir/cnt_mem_centered.psf
 $all writepdb $tmp_dir/cnt_mem_centered.pdb
 $all delete
 
-puts "Padding: X(${final_pad_minus_x}, ${final_pad_plus_x}) Y(${final_pad_minus_y}, ${final_pad_plus_y}) Z(±${final_pad_z})"
+puts "Padding: X(${{final_pad_minus_x}}, ${{final_pad_plus_x}}) Y(${{final_pad_minus_y}}, ${{final_pad_plus_y}}) Z(±${{final_pad_z}})"
 
 #Solvation and ionization
 package require solvate
@@ -105,6 +102,6 @@ solvate $tmp_dir/cnt_mem_centered.psf $tmp_dir/cnt_mem_centered.pdb \
  +x $final_pad_plus_x +y $final_pad_plus_y +z $final_pad_z \
  -o $tmp_dir/cnt_mem_solv
 
-autoionize -psf $tmp_dir/cnt_mem_solv.psf -pdb $tmp_dir/cnt_mem_solv.pdb -sc 0.15 -o $final_dir/cnt_mem_ionized
+autoionize -psf $tmp_dir/cnt_mem_solv.psf -pdb $tmp_dir/cnt_mem_solv.pdb -sc {salt_concentration} -o $final_dir/system_ionized
 
 quit 

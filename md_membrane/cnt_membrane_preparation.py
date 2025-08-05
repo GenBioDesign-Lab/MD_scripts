@@ -65,10 +65,14 @@ class MembranePreparationWorkflow:
             with open(template_file, 'r') as f:
                 template_content = f.read()
             
-            # Replace placeholders with actual values
-            return template_content.format(**kwargs)
-        except KeyError as e:
-            self.log_and_print(f"Error: Missing placeholder in template {template_name}: {e}", important=True)
+            # Replace placeholders using string replacement to avoid conflicts with TCL syntax
+            for key, value in kwargs.items():
+                placeholder = '{' + key + '}'
+                template_content = template_content.replace(placeholder, str(value))
+            
+            return template_content
+        except Exception as e:
+            self.log_and_print(f"Error: Failed to process template {template_name}: {e}", important=True)
             self.log_and_print(f"Available placeholders: {list(kwargs.keys())}", console=False)
             raise
         
@@ -252,7 +256,7 @@ class MembranePreparationWorkflow:
         for script_file in ['solvate_ion_modular.tcl', 'analyze_atoms.tcl', 'calculate_padding.tcl']:
             shutil.copy2(script_dir / script_file, step_dir / script_file)
         
-        # Create modified solvation script based on the modular template
+        # Create modified solvation script from the modular template
         solvate_script = step_dir / 'solvate_system.tcl'
         
         # Prepare paths
@@ -260,13 +264,21 @@ class MembranePreparationWorkflow:
         system_pdb = self.files['system_pdb']
         xsc_file = self.config.get('xsc_file', None)
         
-        # Generate solvation script from template
-        tcl_content = self.load_template('solvate_ionize.tcl',
-            xsc_file=str(xsc_file) if xsc_file else "",
-            system_psf=system_psf,
-            system_pdb=system_pdb,
-            salt_concentration=self.config.get('salt_concentration', 0.15)
-        )
+        # Read the modular template and substitute placeholders
+        template_file = script_dir / 'solvate_ion_modular.tcl'
+        with open(template_file, 'r') as f:
+            tcl_content = f.read()
+        
+        # Convert absolute paths to relative paths from the step directory
+        rel_psf = os.path.relpath(system_psf, step_dir)
+        rel_pdb = os.path.relpath(system_pdb, step_dir)
+        rel_xsc = os.path.relpath(xsc_file, step_dir) if xsc_file else ""
+        
+        # Replace placeholders using string replacement to avoid conflicts with TCL syntax
+        tcl_content = tcl_content.replace('{xsc_file}', rel_xsc)
+        tcl_content = tcl_content.replace('{system_psf}', rel_psf)
+        tcl_content = tcl_content.replace('{system_pdb}', rel_pdb)
+        tcl_content = tcl_content.replace('{salt_concentration}', str(self.config.get('salt_concentration', 0.15)))
         
         with open(solvate_script, 'w') as f:
             f.write(tcl_content)
