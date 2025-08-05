@@ -109,11 +109,11 @@ class MembranePreparationWorkflow:
             return result
             
         except subprocess.CalledProcessError as e:
-            self.log_and_print(f"✗ {step_name} failed!", important=True)
+            self.log_and_print(f"{step_name} failed!", important=True)
             self.log_and_print(f"Error code: {e.returncode}", console=False)
             self.log_and_print(f"STDOUT: {e.stdout}", console=False)
             self.log_and_print(f"STDERR: {e.stderr}", console=False)
-            print(f"✗ {step_name} failed! Check log file for details: {self.log_file}")
+            print(f"{step_name} failed! Check log file for details: {self.log_file}")
             raise
     
     def step1_center_cnt_in_membrane(self):
@@ -435,8 +435,8 @@ class MembranePreparationWorkflow:
             
         except Exception as e:
             self.log_and_print("="*80, console=False)
-            print("✗ WORKFLOW FAILED!")
-            self.log_and_print("✗ WORKFLOW FAILED!", console=False)
+            print("WORKFLOW FAILED!")
+            self.log_and_print("WORKFLOW FAILED!", console=False)
             print(f"Error: {str(e)}")
             self.log_and_print(f"Error: {str(e)}", console=False)
             print(f"Check detailed log file: {self.log_file}")
