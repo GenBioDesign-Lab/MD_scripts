@@ -6,7 +6,7 @@ import logging
 import os
 from datetime import datetime
 
-# Usage: python remove_lipid.py nanotube.pdb membrane.pdb -o cleaned_membrane.pdb -c complex.pdb -r 1.1 -b 2.0 -s
+# Usage: python remove_lipid.py nanotube.pdb membrane.pdb -o -s cleaned_membrane.pdb -c complex.pdb
 
 warnings.filterwarnings("ignore", category=UserWarning, module="MDAnalysis.coordinates.PDB")
 

@@ -38,12 +38,12 @@ print(f"Running PCA analysis on:\nPSF: {psf_file}\nTrajectory: {trajectory_file}
 u = mda.Universe(psf_file, trajectory_file)
 
 # Select backbone atoms
-backbone = u.select_atoms('backbone')
+backbone = u.select_atoms('resname CNT')
 n_bb = len(backbone)
 print(f'There are {n_bb} backbone atoms in the analysis')
 
 # Run PCA on backbone atoms
-pc = pca.PCA(u, select='backbone', align=True, mean=None, n_components=None)
+pc = pca.PCA(u, select='resname CNT', align=True, mean=None, n_components=None)
 pc.run()
 
 # Print PCA components shape

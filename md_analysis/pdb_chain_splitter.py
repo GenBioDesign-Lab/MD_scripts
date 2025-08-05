@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 """
-PDB Chain Splitter
-==================
-
 This script automatically detects chains in a PDB file and splits them into separate files.
 Each chain will be saved as a separate PDB file in the 'output/' directory.
 
