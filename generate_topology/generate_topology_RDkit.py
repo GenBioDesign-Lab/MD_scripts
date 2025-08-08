@@ -1,375 +1,322 @@
-from rdkit import Chem
-import os
 import argparse
+import os
+import subprocess
+from typing import Dict, List, Tuple
 
-# Parse command line arguments
-parser = argparse.ArgumentParser(description='Generate CHARMM RTF topology file from mol2 file')
-parser.add_argument('-i', '--input', required=True, help='Input mol2 file')
-args = parser.parse_args()
+from rdkit import Chem
 
-# Get input filename and create output filename
-input_file = args.input
-output_file = os.path.splitext(input_file)[0] + '.rtf'
-pdb_file = os.path.splitext(input_file)[0] + '.pdb'
 
-mol = Chem.MolFromMol2File(input_file, sanitize=False, removeHs=False)
+# ------------------------------
+# CLI
+# ------------------------------
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Generate CHARMM RTF topology from a MOL2 file and a PDB via OpenBabel"
+    )
+    parser.add_argument("-i", "--input", required=True, help="Input .mol2 file")
+    parser.add_argument(
+        "-r", "--resname", default="CNT", help="Residue name to write in RTF and PDB"
+    )
+    parser.add_argument(
+        "--pdb-only", action="store_true", help="Only generate PDB (skip RTF)"
+    )
+    parser.add_argument(
+        "--rtf-only", action="store_true", help="Only generate RTF (skip PDB)"
+    )
+    return parser.parse_args()
 
-# Check if molecule has more than 1000 atoms for renaming logic
-has_many_atoms = mol.GetNumAtoms() > 1000
-if has_many_atoms:
-    print(f"Molecule has {mol.GetNumAtoms()} atoms. Applying atom renaming")
 
-# Assign custom partial charges based on bonding patterns
-def assign_custom_charges(mol):
+# ------------------------------
+# Atom naming
+# ------------------------------
+def base36(n: int) -> str:
+    digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    if n == 0:
+        return "0"
+    out = []
+    while n > 0:
+        n, r = divmod(n, 36)
+        out.append(digits[r])
+    return "".join(reversed(out))
+
+
+def build_atom_name_map(mol: Chem.Mol) -> List[str]:
     """
-    Assign custom partial charges based on bonding patterns:
-    - C bonded to H: -0.115
-    - H bonded to C: 0.115
-    - C bonded to O: 0.11
-    - O bonded to C: -0.53
-    - H bonded to O: 0.42
-    - All other C: 0
+    Produce a stable 4-character atom name for each atom index, consistent across RTF and PDB.
+
+    Strategy:
+    - Per element counter in traversal order
+    - Name = <ElementSymbol><3-char base36 counter>, padded to width 3
+      e.g. C -> C001.. C00A .. C010, H -> H001..
+    - Ensures max width 4 for PDB atom name column
     """
+    element_counts: Dict[str, int] = {}
+    names: List[str] = []
     for atom in mol.GetAtoms():
-        charge = 0.0
         element = atom.GetSymbol()
-        
-        # Get neighboring atoms
-        neighbors = [n.GetSymbol() for n in atom.GetNeighbors()]
-        
-        if element == 'C':
-            if 'H' in neighbors:
+        count = element_counts.get(element, 0) + 1
+        element_counts[element] = count
+        suffix = base36(count).rjust(3, "0")  # width 3, base36
+        name = f"{element}{suffix}"[:4]  # hard cap to 4 chars for PDB
+        names.append(name)
+    return names
+
+
+# ------------------------------
+# Custom charges
+# ------------------------------
+def assign_custom_charges(mol: Chem.Mol) -> None:
+    for atom in mol.GetAtoms():
+        element = atom.GetSymbol()
+        neighbor_symbols = [n.GetSymbol() for n in atom.GetNeighbors()]
+
+        charge = 0.0
+        if element == "C":
+            if "H" in neighbor_symbols:
                 charge = -0.115
-            elif 'O' in neighbors:
+            elif "O" in neighbor_symbols:
                 charge = 0.11
-            else:
-                charge = 0.0
-        elif element == 'H':
-            if 'C' in neighbors:
+        elif element == "H":
+            if "C" in neighbor_symbols:
                 charge = 0.115
-            elif 'O' in neighbors:
+            elif "O" in neighbor_symbols:
                 charge = 0.42
-        elif element == 'O':
-            if 'C' in neighbors:
+        elif element == "O":
+            if "C" in neighbor_symbols:
                 charge = -0.53
-        
-        atom.SetProp('_CustomCharge', str(charge))
 
-assign_custom_charges(mol)
+        atom.SetProp("_CustomCharge", str(charge))
 
-bonds = [(b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds()]
-angles = []
-for b in mol.GetBonds():
-    i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
-    for n in mol.GetAtomWithIdx(j).GetNeighbors():
-        k = n.GetIdx()
-        if k != i:
-            angles.append((i, j, k))
-    for n in mol.GetAtomWithIdx(i).GetNeighbors():
-        k = n.GetIdx()
-        if k != j:
-            angles.append((j, i, k))
 
-angles = list({tuple(a) for a in angles})
+# ------------------------------
+# Topology extraction (bonds / angles / torsions / impropers)
+# ------------------------------
+def extract_bonds(mol: Chem.Mol) -> List[Tuple[int, int]]:
+    return [(b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds()]
 
-torsions = []
-for bond12 in mol.GetBonds():
-    i, j = bond12.GetBeginAtomIdx(), bond12.GetEndAtomIdx()
-    for bond23 in mol.GetAtomWithIdx(j).GetBonds():
-        if bond23.GetIdx() == bond12.GetIdx():
-            continue
-        k = bond23.GetOtherAtomIdx(j)
-        for bond34 in mol.GetAtomWithIdx(k).GetBonds():
-            if bond34.GetIdx() in (bond12.GetIdx(), bond23.GetIdx()):
+
+def extract_angles(mol: Chem.Mol) -> List[Tuple[int, int, int]]:
+    angles: List[Tuple[int, int, int]] = []
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        for n in mol.GetAtomWithIdx(j).GetNeighbors():
+            k = n.GetIdx()
+            if k != i:
+                angles.append((i, j, k))
+        for n in mol.GetAtomWithIdx(i).GetNeighbors():
+            k = n.GetIdx()
+            if k != j:
+                angles.append((j, i, k))
+    return list({tuple(a) for a in angles})
+
+
+def extract_torsions(mol: Chem.Mol) -> List[Tuple[int, int, int, int]]:
+    torsions: List[Tuple[int, int, int, int]] = []
+    for bond12 in mol.GetBonds():
+        i, j = bond12.GetBeginAtomIdx(), bond12.GetEndAtomIdx()
+        for bond23 in mol.GetAtomWithIdx(j).GetBonds():
+            if bond23.GetIdx() == bond12.GetIdx():
                 continue
-            l = bond34.GetOtherAtomIdx(k)
-            torsions.append((i, j, k, l))
+            k = bond23.GetOtherAtomIdx(j)
+            for bond34 in mol.GetAtomWithIdx(k).GetBonds():
+                if bond34.GetIdx() in (bond12.GetIdx(), bond23.GetIdx()):
+                    continue
+                l = bond34.GetOtherAtomIdx(k)
+                torsions.append((i, j, k, l))
+    return list({t if t < t[::-1] else t[::-1] for t in torsions})
 
-torsions = list({t if t < t[::-1] else t[::-1] for t in torsions})
 
-impropers = []
-# Try to compute hybridization for improper detection
-try:
-    mol_copy = Chem.Mol(mol)
-    Chem.rdMolOps.SetHybridization(mol_copy)
-    
-    for i, a in enumerate(mol.GetAtoms()):
-        a_copy = mol_copy.GetAtomWithIdx(i)
-        nbrs = [n.GetIdx() for n in a.GetNeighbors()]
-        if len(nbrs) == 3 and a_copy.GetHybridization() in (Chem.rdchem.HybridizationType.SP2,
-                                                           Chem.rdchem.HybridizationType.SP):
-            idx, j, k, l = a.GetIdx(), *nbrs
-            impropers.append((j, idx, k, l))
-except:
-    # Fallback: detect impropers based on carbon atoms with 3 aromatic bonds
-    for a in mol.GetAtoms():
-        if a.GetSymbol() == 'C':
+def extract_impropers(mol: Chem.Mol) -> List[Tuple[int, int, int, int]]:
+    impropers: List[Tuple[int, int, int, int]] = []
+    try:
+        mol_copy = Chem.Mol(mol)
+        Chem.rdMolOps.SetHybridization(mol_copy)
+        for i, a in enumerate(mol.GetAtoms()):
+            a_copy = mol_copy.GetAtomWithIdx(i)
             nbrs = [n.GetIdx() for n in a.GetNeighbors()]
-            if len(nbrs) == 3:
-                aromatic_bonds = 0
-                for bond in a.GetBonds():
-                    if bond.GetBondType() == Chem.rdchem.BondType.AROMATIC:
-                        aromatic_bonds += 1
-                
-                if aromatic_bonds >= 2:
-                    idx, j, k, l = a.GetIdx(), *nbrs
-                    impropers.append((j, idx, k, l))
+            if len(nbrs) == 3 and a_copy.GetHybridization() in (
+                Chem.rdchem.HybridizationType.SP2,
+                Chem.rdchem.HybridizationType.SP,
+            ):
+                idx, j, k, l = a.GetIdx(), *nbrs
+                impropers.append((j, idx, k, l))
+    except Exception:
+        for a in mol.GetAtoms():
+            if a.GetSymbol() == "C":
+                nbrs = [n.GetIdx() for n in a.GetNeighbors()]
+                if len(nbrs) == 3:
+                    aromatic_bonds = sum(
+                        1 for b in a.GetBonds() if b.GetBondType() == Chem.rdchem.BondType.AROMATIC
+                    )
+                    if aromatic_bonds >= 2:
+                        idx, j, k, l = a.GetIdx(), *nbrs
+                        impropers.append((j, idx, k, l))
+    return impropers
 
-topology = {
-    "bonds": bonds,
-    "angles": angles,
-    "torsions": torsions,
-    "impropers": impropers,
-}
 
-# Write CHARMM-style RTF file
-def write_charmm_rtf(topology, filename="topology.rtf"):
-    """Write topology in CHARMM RTF format"""
-    with open(filename, 'w') as f:
+# ------------------------------
+# RTF writer
+# ------------------------------
+def write_charmm_rtf(
+    mol: Chem.Mol,
+    atom_names: List[str],
+    bonds: List[Tuple[int, int]],
+    angles: List[Tuple[int, int, int]],
+    torsions: List[Tuple[int, int, int, int]],
+    impropers: List[Tuple[int, int, int, int]],
+    filename: str,
+    residue_name: str,
+) -> None:
+    total_charge = 0.0
+    for i in range(mol.GetNumAtoms()):
+        atom = mol.GetAtomWithIdx(i)
+        if atom.HasProp("_CustomCharge"):
+            total_charge += float(atom.GetProp("_CustomCharge"))
+
+    with open(filename, "w") as f:
         f.write("* Topology file generated from RDKit\n")
         f.write("MASS     1 CCNT     12.011000\n")
         f.write("MASS     2 OCNT     16.000000\n")
         f.write("MASS     3 HOCNT      1.008000\n")
         f.write("MASS     4 HCCNT      1.008000\n")
         f.write("*\n\n")
-        # Calculate total charge from custom charges
-        total_charge = 0.0
-        for i in range(mol.GetNumAtoms()):
-            atom = mol.GetAtomWithIdx(i)
-            if atom.HasProp('_CustomCharge'):
-                charge = float(atom.GetProp('_CustomCharge'))
-                total_charge += charge
-        
-        f.write(f"RESI CNT    {total_charge:8.3f}\n")
+        f.write(f"RESI {residue_name}    {total_charge:8.3f}\n")
         f.write("GROUP\n")
-        
-        # Atoms section
-        atom_counts = {}
-        
+
+        # atoms
         for i in range(mol.GetNumAtoms()):
             atom = mol.GetAtomWithIdx(i)
             element = atom.GetSymbol()
-            
-            if element not in atom_counts:
-                atom_counts[element] = 0
-            atom_counts[element] += 1
-            
-            # Apply renaming logic if molecule has >1000 atoms
-            count = atom_counts[element]
-            if has_many_atoms and count > 999:
-                # Use mixed character/number combinations
-                excess = count - 999
-                letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-                digits = '0123456789'
-                
-                # Simple pattern cycling: 3600 combinations each (36*10*10)
-                patterns = ['#**', '*##', '##*']  # char+num+num, num+char+char, char+char+num
-                pattern_idx = (excess - 1) // 3600
-                pos = (excess - 1) % 3600
-                
-                if patterns[pattern_idx % 3] == '#**':  # CA00, CA01, ..., CZ99
-                    c1, n1, n2 = pos // 100, (pos % 100) // 10, pos % 10
-                    atom_name = f"{element}{letters[c1 % 26]}{digits[n1]}{digits[n2]}"
-                elif patterns[pattern_idx % 3] == '*##':  # C0AA, C0AB, ..., C9ZZ
-                    n1, c1, c2 = pos // 676, (pos % 676) // 26, pos % 26
-                    atom_name = f"{element}{digits[n1 % 10]}{letters[c1]}{letters[c2]}"
-                else:  # '##*' - CAA0, CAA1, ..., CZZ9
-                    c1, c2, n1 = pos // 260, (pos % 260) // 10, pos % 10
-                    atom_name = f"{element}{letters[c1 % 26]}{letters[c2 % 26]}{digits[n1]}"
-            else:
-                atom_name = f"{element}{count}"
-
-            # Determine CHARMM type based on actual element (not renamed atom name)
-            if element == 'C':
+            if element == "C":
                 charmm_type = "CCNT"
-            elif element == 'O':
+            elif element == "O":
                 charmm_type = "OCNT"
-            elif element == 'H':
+            elif element == "H":
                 bonded_atoms = [n for n in atom.GetNeighbors()]
-                if bonded_atoms:
-                    bonded_element = bonded_atoms[0].GetSymbol()
-                    if bonded_element == 'O':
-                        charmm_type = "HOCNT"
-                    else:
-                        charmm_type = "HCCNT"
+                if bonded_atoms and bonded_atoms[0].GetSymbol() == "O":
+                    charmm_type = "HOCNT"
                 else:
                     charmm_type = "HCCNT"
             else:
                 charmm_type = element
-            
-            charge = 0.0
-            if atom.HasProp('_CustomCharge'):
-                charge = float(atom.GetProp('_CustomCharge'))
-            
-            f.write(f"ATOM {atom_name:<4s} {charmm_type:<6s} {charge:8.3f}\n")
+
+            charge = float(atom.GetProp("_CustomCharge")) if atom.HasProp("_CustomCharge") else 0.0
+            f.write(f"ATOM {atom_names[i]:<4s} {charmm_type:<6s} {charge:8.3f}\n")
         f.write("\n")
-        
-        def get_atom_name(atom_idx):
-            atom = mol.GetAtomWithIdx(atom_idx)
-            element = atom.GetSymbol()
-            count = 1
-            for i in range(atom_idx):
-                if mol.GetAtomWithIdx(i).GetSymbol() == element:
-                    count += 1
-            
-            # Apply renaming logic if molecule has >1000 atoms
-            if has_many_atoms and count > 999:
-                # Use mixed character/number combinations
-                excess = count - 999
-                letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-                digits = '0123456789'
-                
-                # Simple pattern cycling: 3600 combinations each (36*10*10)
-                patterns = ['#**', '*##', '##*']  # char+num+num, num+char+char, char+char+num
-                pattern_idx = (excess - 1) // 3600
-                pos = (excess - 1) % 3600
-                
-                if patterns[pattern_idx % 3] == '#**':  # CA00, CA01, ..., CZ99
-                    c1, n1, n2 = pos // 100, (pos % 100) // 10, pos % 10
-                    return f"{element}{letters[c1 % 26]}{digits[n1]}{digits[n2]}"
-                elif patterns[pattern_idx % 3] == '*##':  # C0AA, C0AB, ..., C9ZZ
-                    n1, c1, c2 = pos // 676, (pos % 676) // 26, pos % 26
-                    return f"{element}{digits[n1 % 10]}{letters[c1]}{letters[c2]}"
-                else:  # '##*' - CAA0, CAA1, ..., CZZ9
-                    c1, c2, n1 = pos // 260, (pos % 260) // 10, pos % 10
-                    return f"{element}{letters[c1 % 26]}{letters[c2 % 26]}{digits[n1]}"
-            else:
-                return f"{element}{count}"
-        
-        # Bonds section
-        if topology['bonds']:
-            for atom1, atom2 in topology['bonds']:
-                atom1_name = get_atom_name(atom1)
-                atom2_name = get_atom_name(atom2)
-                f.write(f"BOND {atom1_name:<4s} {atom2_name:<4s}\n")
-            f.write("\n")
-        
-        # Angles section
-        if topology['angles']:
-            for atom1, atom2, atom3 in topology['angles']:
-                atom1_name = get_atom_name(atom1)
-                atom2_name = get_atom_name(atom2)
-                atom3_name = get_atom_name(atom3)
-                f.write(f"ANGL {atom1_name:<4s} {atom2_name:<4s} {atom3_name:<4s}\n")
-            f.write("\n")
-        
-        # Dihedrals section
-        if topology['torsions']:
-            for atom1, atom2, atom3, atom4 in topology['torsions']:
-                atom1_name = get_atom_name(atom1)
-                atom2_name = get_atom_name(atom2)
-                atom3_name = get_atom_name(atom3)
-                atom4_name = get_atom_name(atom4)
-                f.write(f"DIHE {atom1_name:<4s} {atom2_name:<4s} {atom3_name:<4s} {atom4_name:<4s}\n")
-            f.write("\n")
-        
-        # Improper dihedrals section
-        if topology['impropers']:
-            for atom1, atom2, atom3, atom4 in topology['impropers']:
-                atom1_name = get_atom_name(atom1)
-                atom2_name = get_atom_name(atom2)
-                atom3_name = get_atom_name(atom3)
-                atom4_name = get_atom_name(atom4)
-                f.write(f"IMPR {atom1_name:<4s} {atom2_name:<4s} {atom3_name:<4s} {atom4_name:<4s}\n")
-            f.write("\n")
-        
-        f.write("END\n")
 
-# Post-process PDB file to rename atoms consistently with RTF topology
-def rename_pdb_atoms(pdb_filename, mol):
-    """Rename atoms in PDB file to match RTF topology naming (C1, C2, H1, etc.)"""
-    def get_atom_name(atom_idx):
-        atom = mol.GetAtomWithIdx(atom_idx)
-        element = atom.GetSymbol()
-        count = 1
-        for i in range(atom_idx):
-            if mol.GetAtomWithIdx(i).GetSymbol() == element:
-                count += 1
-        
-        # Apply renaming logic if molecule has >1000 atoms
-        if has_many_atoms and count > 999:
-            # Use mixed character/number combinations
-            excess = count - 999
-            letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-            digits = '0123456789'
-            
-            # Simple pattern cycling: 3600 combinations each (36*10*10)
-            patterns = ['#**', '*##', '##*']  # char+num+num, num+char+char, char+char+num
-            pattern_idx = (excess - 1) // 3600
-            pos = (excess - 1) % 3600
-            
-            if patterns[pattern_idx % 3] == '#**':  # CA00, CA01, ..., CZ99
-                c1, n1, n2 = pos // 100, (pos % 100) // 10, pos % 10
-                return f"{element}{letters[c1 % 26]}{digits[n1]}{digits[n2]}"
-            elif patterns[pattern_idx % 3] == '*##':  # C0AA, C0AB, ..., C9ZZ
-                n1, c1, c2 = pos // 676, (pos % 676) // 26, pos % 26
-                return f"{element}{digits[n1 % 10]}{letters[c1]}{letters[c2]}"
-            else:  # '##*' - CAA0, CAA1, ..., CZZ9
-                c1, c2, n1 = pos // 260, (pos % 260) // 10, pos % 10
-                return f"{element}{letters[c1 % 26]}{letters[c2 % 26]}{digits[n1]}"
-        else:
-            return f"{element}{count}"
-    
-    try:
-        with open(pdb_filename, 'r') as f:
-            lines = f.readlines()
-        
-        new_lines = []
-        atom_counter = 0
-        
-        for line in lines:
-            if line.startswith('ATOM') or line.startswith('HETATM'):
-                if len(line) >= 80:
-                    new_atom_name = get_atom_name(atom_counter)
-                    new_line = (line[:12] + f"{new_atom_name:<4s}" + line[16:])
-                    new_lines.append(new_line)
-                    atom_counter += 1
-                else:
-                    new_lines.append(line)
-            else:
+        def nm(idx: int) -> str:
+            return atom_names[idx]
+
+        # bonds
+        for i, j in bonds:
+            f.write(f"BOND {nm(i):<4s} {nm(j):<4s}\n")
+        f.write("\n")
+
+        # angles
+        for i, j, k in angles:
+            f.write(f"ANGL {nm(i):<4s} {nm(j):<4s} {nm(k):<4s}\n")
+        f.write("\n")
+
+        # torsions
+        for i, j, k, l in torsions:
+            f.write(f"DIHE {nm(i):<4s} {nm(j):<4s} {nm(k):<4s} {nm(l):<4s}\n")
+        f.write("\n")
+
+        # impropers
+        for i, j, k, l in impropers:
+            f.write(f"IMPR {nm(i):<4s} {nm(j):<4s} {nm(k):<4s} {nm(l):<4s}\n")
+        f.write("\nEND\n")
+
+
+# ------------------------------
+# PDB via OpenBabel CLI, then rename atom names
+# ------------------------------
+def write_pdb_with_openbabel_cli(mol2_filename: str, pdb_filename: str) -> None:
+    cmd = ["obabel", mol2_filename, "-O", pdb_filename]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"OpenBabel failed: {result.stderr.strip()}")
+
+
+def rename_pdb_atoms_inplace(pdb_filename: str, atom_names: List[str], residue_name: str) -> None:
+    with open(pdb_filename, "r") as f:
+        lines = f.readlines()
+
+    new_lines: List[str] = []
+    atom_counter = 0
+    for line in lines:
+        if line.startswith("ATOM") or line.startswith("HETATM"):
+            if len(line) < 54:
                 new_lines.append(line)
-        
-        with open(pdb_filename, 'w') as f:
-            f.writelines(new_lines)
-        
-        return True
-    except:
-        return False
+                continue
+            # PDB columns: atom name (13-16), res name (18-20)
+            atom_name = f"{atom_names[atom_counter]:<4s}"[:4]
+            line = line[:12] + atom_name + line[16:]
+            # set residue name to requested value
+            if len(line) >= 20:
+                line = line[:17] + f"{residue_name:>3s}" + line[20:]
+            new_lines.append(line)
+            atom_counter += 1
+        else:
+            new_lines.append(line)
 
-# Write PDB using OpenBabel
-def write_pdb_openbabel(mol2_filename, pdb_filename):
-    """Write PDB file using OpenBabel conversion from mol2"""
-    try:
-        import subprocess
-        cmd = ['obabel', mol2_filename, '-O', pdb_filename]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        return result.returncode == 0
-    except:
-        return False
+    with open(pdb_filename, "w") as f:
+        f.writelines(new_lines)
 
-# Alternative: Use Python OpenBabel if available
-def write_pdb_openbabel_python(mol2_filename, pdb_filename):
-    """Write PDB file using Python OpenBabel library"""
-    try:
-        from openbabel import openbabel as ob
-        conv = ob.OBConversion()
-        mol = ob.OBMol()
-        conv.SetInAndOutFormats("mol2", "pdb")
-        conv.ReadFile(mol, mol2_filename)
-        conv.WriteFile(mol, pdb_filename)
-        return True
-    except:
-        return False
 
-# Generate files
-write_charmm_rtf(topology, output_file)
+# ------------------------------
+# Main
+# ------------------------------
+def main() -> None:
+    args = parse_args()
+    input_file = os.path.abspath(args.input)
+    rtf_file = os.path.splitext(input_file)[0] + ".rtf"
+    pdb_file = os.path.splitext(input_file)[0] + ".pdb"
 
-pdb_generated = write_pdb_openbabel(input_file, pdb_file)
-if not pdb_generated:
-    pdb_generated = write_pdb_openbabel_python(input_file, pdb_file)
+    mol = Chem.MolFromMol2File(input_file, sanitize=False, removeHs=False)
+    if mol is None:
+        raise RuntimeError(f"Failed to read MOL2: {input_file}")
 
-if pdb_generated:
-    rename_pdb_atoms(pdb_file, mol)
+    # naming map up-front for consistent usage
+    atom_names = build_atom_name_map(mol)
 
-print(f"Files generated: {output_file}, {pdb_file}")
-print(f"Topology: {len(topology['bonds'])} bonds, {len(topology['angles'])} angles, {len(topology['torsions'])} torsions, {len(topology['impropers'])} impropers")
+    # custom charges
+    assign_custom_charges(mol)
+
+    # topology
+    bonds = extract_bonds(mol)
+    angles = extract_angles(mol)
+    torsions = extract_torsions(mol)
+    impropers = extract_impropers(mol)
+
+    # outputs
+    if not args.pdb_only:
+        write_charmm_rtf(
+            mol,
+            atom_names,
+            bonds,
+            angles,
+            torsions,
+            impropers,
+            rtf_file,
+            residue_name=args.resname,
+        )
+
+    if not args.rtf_only:
+        write_pdb_with_openbabel_cli(input_file, pdb_file)
+        rename_pdb_atoms_inplace(pdb_file, atom_names, residue_name=args.resname)
+
+    print(
+        f"Files generated: {rtf_file if not args.pdb_only else '(skipped)'}, "
+        f"{pdb_file if not args.rtf_only else '(skipped)'}"
+    )
+    print(
+        "Topology: "
+        f"{len(bonds)} bonds, {len(angles)} angles, {len(torsions)} torsions, {len(impropers)} impropers"
+    )
+
+
+if __name__ == "__main__":
+    main()
+
+
