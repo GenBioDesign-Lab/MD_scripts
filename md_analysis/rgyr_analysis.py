@@ -1,63 +1,84 @@
+import argparse
+import os
+import sys
+from typing import List
+
 import MDAnalysis as mda
 import matplotlib.pyplot as plt
 import pandas as pd
-import sys
-import os
 
-# Get input files from command line
-if len(sys.argv) == 3:
-    psf_file = sys.argv[1]
-    traj_file = sys.argv[2]
-else:
-    print("Usage: python rgyr_analysis.py <path_to_psf_file> <path_to_trajectory_file>")
-    sys.exit(1)
 
-# Check if files exist
-if not os.path.exists(psf_file):
-    print(f"Error: PSF file {psf_file} not found")
-    sys.exit(1)
-if not os.path.exists(traj_file):
-    print(f"Error: Trajectory file {traj_file} not found")
-    sys.exit(1)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Compute radius of gyration from a trajectory and save CSV and plot."
+    )
+    parser.add_argument("topology", help="Path to topology file (e.g., PSF/PDB)")
+    parser.add_argument("trajectory", help="Path to trajectory file (e.g., DCD/XTC)")
+    parser.add_argument(
+        "--selection",
+        default="protein",
+        help="Atom selection string (default: 'protein')",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory to write outputs. Default: '<trajectory_dir>/output'",
+    )
+    parser.add_argument(
+        "--no-show",
+        action="store_true",
+        help="Do not display plots interactively",
+    )
+    return parser.parse_args()
 
-# Create output directory
-traj_dir = os.path.dirname(traj_file)
-output_dir = os.path.join(traj_dir, "output")
-os.makedirs(output_dir, exist_ok=True)
 
-# Get base name of trajectory file for output naming
-traj_base = os.path.splitext(os.path.basename(traj_file))[0]
+def main() -> None:
+    args = parse_args()
 
-# Load data
-u = mda.Universe(psf_file, traj_file)
-protein = u.select_atoms("protein") #if you want choose another atom, just change the name, prefer to this link: https://userguide.mdanalysis.org/stable/selections.html
+    if not os.path.exists(args.topology):
+        print(f"Error: topology file not found: {args.topology}")
+        sys.exit(1)
+    if not os.path.exists(args.trajectory):
+        print(f"Error: trajectory file not found: {args.trajectory}")
+        sys.exit(1)
 
-rgyr = []
-times = []
+    traj_dir = os.path.dirname(args.trajectory)
+    output_dir = args.output_dir or os.path.join(traj_dir, "output")
+    os.makedirs(output_dir, exist_ok=True)
 
-for ts in u.trajectory:
-    rgyr.append(protein.radius_of_gyration())
-    times.append(ts.time)
+    traj_base = os.path.splitext(os.path.basename(args.trajectory))[0]
 
-df = pd.DataFrame({
-    "Time (ps)": times,
-    "Radius of Gyration (Å)": rgyr
-})
+    u = mda.Universe(args.topology, args.trajectory)
+    atom_group = u.select_atoms(args.selection)
 
-# Save data to CSV in output directory
-csv_path = os.path.join(output_dir, f"{traj_base}_rgyr.csv")
-df.to_csv(csv_path, index=False)
+    time_ps: List[float] = []
+    rgyr_angstrom: List[float] = []
 
-# Create plot
-plt.figure(figsize=(10, 6))
-plt.plot(times, rgyr)
-plt.xlabel("Time (ps)")
-plt.ylabel("Radius of Gyration (Å)")
-plt.title(f"Protein Compactness - {traj_base}")
+    for ts in u.trajectory:
+        time_ps.append(ts.time)
+        rgyr_angstrom.append(atom_group.radius_of_gyration())
 
-# Save plot to output directory
-plot_path = os.path.join(output_dir, f"{traj_base}_rgyr_plot.png")
-plt.savefig(plot_path, dpi=300)
+    df = pd.DataFrame({
+        "time_ps": time_ps,
+        "rgyr_angstrom": rgyr_angstrom,
+    })
 
-# Show the plot
-plt.show()
+    csv_path = os.path.join(output_dir, f"{traj_base}_rgyr.csv")
+    df.to_csv(csv_path, index=False)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(df["time_ps"], df["rgyr_angstrom"])
+    plt.xlabel("Time (ps)")
+    plt.ylabel("Radius of Gyration (Å)")
+    plt.title(f"Radius of Gyration - {traj_base}")
+    plt.tight_layout()
+
+    plot_path = os.path.join(output_dir, f"{traj_base}_rgyr_plot.png")
+    plt.savefig(plot_path, dpi=300)
+    if not args.no_show:
+        plt.show()
+    plt.close()
+
+
+if __name__ == "__main__":
+    main()

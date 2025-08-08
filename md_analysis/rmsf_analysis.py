@@ -1,61 +1,80 @@
+import argparse
+import os
+import sys
+
 import MDAnalysis as mda
 from MDAnalysis.analysis.rms import RMSF
 import matplotlib.pyplot as plt
 import pandas as pd
-import sys
-import os
 
-# Get input files from command line
-if len(sys.argv) == 3:
-    psf_file = sys.argv[1]
-    traj_file = sys.argv[2]
-else:
-    print("Usage: python rmsf_analysis.py <path_to_psf_file> <path_to_trajectory_file>")
-    sys.exit(1)
 
-# Check if files exist
-if not os.path.exists(psf_file):
-    print(f"Error: PSF file {psf_file} not found")
-    sys.exit(1)
-if not os.path.exists(traj_file):
-    print(f"Error: Trajectory file {traj_file} not found")
-    sys.exit(1)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Compute per-residue RMSF from a trajectory and save CSV and plot."
+    )
+    parser.add_argument("topology", help="Path to topology file (e.g., PSF/PDB)")
+    parser.add_argument("trajectory", help="Path to trajectory file (e.g., DCD/XTC)")
+    parser.add_argument(
+        "--selection",
+        default="name CA",
+        help="Atom selection for RMSF (default: 'name CA')",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory to write outputs. Default: '<trajectory_dir>/output'",
+    )
+    parser.add_argument(
+        "--no-show",
+        action="store_true",
+        help="Do not display plots interactively",
+    )
+    return parser.parse_args()
 
-# Create output directory
-traj_dir = os.path.dirname(traj_file)
-output_dir = os.path.join(traj_dir, "output")
-os.makedirs(output_dir, exist_ok=True)
 
-# Get base name of trajectory file for output naming
-traj_base = os.path.splitext(os.path.basename(traj_file))[0]
+def main() -> None:
+    args = parse_args()
 
-# Load data
-u = mda.Universe(psf_file, traj_file)
-ca_atoms = u.select_atoms("name CA")   #if you want choose another atom, just change the name, prefer to this link: https://userguide.mdanalysis.org/stable/selections.html
+    if not os.path.exists(args.topology):
+        print(f"Error: topology file not found: {args.topology}")
+        sys.exit(1)
+    if not os.path.exists(args.trajectory):
+        print(f"Error: trajectory file not found: {args.trajectory}")
+        sys.exit(1)
 
-rmsf = RMSF(ca_atoms)
-rmsf.run()
+    traj_dir = os.path.dirname(args.trajectory)
+    output_dir = args.output_dir or os.path.join(traj_dir, "output")
+    os.makedirs(output_dir, exist_ok=True)
 
-# Use results.rmsf instead of rmsf attribute to avoid deprecation warning
-df = pd.DataFrame({
-    "Residue": ca_atoms.resids,
-    "RMSF (Å)": rmsf.results.rmsf
-})
+    traj_base = os.path.splitext(os.path.basename(args.trajectory))[0]
 
-# Save data to CSV in output directory
-csv_path = os.path.join(output_dir, f"{traj_base}_rmsf.csv")
-df.to_csv(csv_path, index=False)
+    u = mda.Universe(args.topology, args.trajectory)
+    atom_group = u.select_atoms(args.selection)
 
-# Create plot
-plt.figure(figsize=(10, 6))
-plt.plot(df["Residue"], df["RMSF (Å)"])
-plt.xlabel("Residue")
-plt.ylabel("RMSF (Å)")
-plt.title(f"Per-residue RMSF - {traj_base}")
+    rmsf = RMSF(atom_group)
+    rmsf.run()
 
-# Save plot to output directory
-plot_path = os.path.join(output_dir, f"{traj_base}_rmsf_plot.png")
-plt.savefig(plot_path, dpi=300)
+    df = pd.DataFrame({
+        "residue_index": atom_group.resids,
+        "rmsf_angstrom": rmsf.results.rmsf,
+    })
 
-# Show the plot
-plt.show()
+    csv_path = os.path.join(output_dir, f"{traj_base}_rmsf.csv")
+    df.to_csv(csv_path, index=False)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(df["residue_index"], df["rmsf_angstrom"])
+    plt.xlabel("Residue Index")
+    plt.ylabel("RMSF (Å)")
+    plt.title(f"Per-residue RMSF - {traj_base}")
+    plt.tight_layout()
+
+    plot_path = os.path.join(output_dir, f"{traj_base}_rmsf_plot.png")
+    plt.savefig(plot_path, dpi=300)
+    if not args.no_show:
+        plt.show()
+    plt.close()
+
+
+if __name__ == "__main__":
+    main()
